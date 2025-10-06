@@ -1,0 +1,4 @@
+name: gaode_weather
+label: 高德天气预报查询
+description: 根据传递的天气信息查询天气预报信息
+params: []

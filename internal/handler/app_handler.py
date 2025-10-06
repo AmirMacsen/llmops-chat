@@ -135,14 +135,5 @@ class AppHandler(object):
 
     def ping(self):
         """测试方法"""
-        # 服务提供商
-        google = self.provider.get_provider("google")
-        google_serper_entity = google.get_tool_entity("google_serper")
-        print(google_serper_entity)
-
-
-        # 获取工厂类
-        tool = self.provider.get_tool("google", "google_serper")
-        print(tool)
-        print(tool().invoke("2024年举行奥运会了吗？"))
-        return "pong"
+        entities = self.provider.get_provider_entities()
+        return success_json({"ping": [p.dict() for p in entities]})

@@ -22,6 +22,18 @@
   icon: icon.svg
   background: "#E5E7E8"
   category: 文生图
+- name: gaode
+  label: 高德服务提供商
+  description: 内置了天气预报和ip查询功能
+  icon: icon.svg
+  background: "#E5E7E8"
+  category: 实用工具
+- name: wikipedia
+  label: 维基百科
+  description: 维基百科是一个由全球的知识分享者创建的免费在线百科全书
+  icon: icon.svg
+  background: "#E5E7E8"
+  category: 实用工具
 
 
 

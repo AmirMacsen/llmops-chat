@@ -1,4 +1,4 @@
-name: dalle3
+name: dalle
 label: DALLE-3绘图工具
 description: 一个文生图的工具
 params:

@@ -24,7 +24,7 @@ class ProviderFactory(object):
     def get_providers(self) -> list[Provider]:
         return list(self.provider_map.values())
 
-    def get_provider_entities(self, provider_name:str) -> List[ProviderEntity]:
+    def get_provider_entities(self) -> List[ProviderEntity]:
         return [provider.provider_entity for provider in self.provider_map.values()]
 
     def get_tool(self, provider_name:str, tool_name:str) -> Any:

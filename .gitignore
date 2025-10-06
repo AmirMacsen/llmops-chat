@@ -1,5 +1,5 @@
 .venv
 .env
 .tmp/*
-.study
+study
 .idea
