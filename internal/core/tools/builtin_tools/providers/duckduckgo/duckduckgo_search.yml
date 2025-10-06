@@ -1,0 +1,4 @@
+name: duckduckgo_search
+label: duckduckgo搜索
+description: 这是一个注重隐私的duckduckgo搜索工具。当你需要搜索时事的时候就可以使用，输出信息是一个查询语句。
+params: []
