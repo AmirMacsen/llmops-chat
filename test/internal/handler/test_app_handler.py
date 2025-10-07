@@ -5,16 +5,19 @@ from pkg.response import HttpCode
 
 class TestAppHandler:
 
-    @pytest.mark.parametrize("query", [None, "你好，你是谁"])
-    def test_completion(self,query, client):
+    @pytest.mark.parametrize(
+        "app_id, query",
+        [
+            ("a23241c4-b3c1-4f09-8759-e9afbd9f10e4", None),
+            ("a23241c4-b3c1-4f09-8759-e9afbd9f10e4", "你好,你是谁？"),
+        ]
+    )
+    def test_debug(self,app_id, query, client):
         """测试completion接口"""
         resp = client.post(
-            "/completion",
-            json={
-                "query": query
-            }
+            f"/apps/{app_id}/debug",
+            json={"query": query}
         )
-        print("11111", resp.json)
         assert resp.status_code == 200
         if query is None:
             assert resp.json.get("code") == HttpCode.VALIDATE_ERROR

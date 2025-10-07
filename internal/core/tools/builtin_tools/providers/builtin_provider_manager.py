@@ -3,6 +3,7 @@ from typing import Any, List
 
 import yaml
 from injector import singleton, inject
+from pydantic import Field
 
 from internal.core.tools.builtin_tools.entities import ProviderEntity, Provider, ToolEntity
 
@@ -11,10 +12,11 @@ from internal.core.tools.builtin_tools.entities import ProviderEntity, Provider,
 @singleton
 class BuiltinProviderManager(object):
     """服务提供商工厂类"""
-    provider_map:dict[str, Provider] = {}
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """实例化服务提供商工厂类"""
+        super().__init__(**kwargs)
+        self.provider_map: dict[str, Provider] = {}
         self._get_provider_tool_map()
 
     def get_provider(self, provider_name:str) -> Provider:
@@ -22,6 +24,7 @@ class BuiltinProviderManager(object):
 
 
     def get_providers(self) -> list[Provider]:
+        print(self.provider_map)
         return list(self.provider_map.values())
 
     def get_provider_entities(self) -> List[ProviderEntity]:
@@ -52,10 +55,3 @@ class BuiltinProviderManager(object):
                 position=idx+1,
                 provider_entity=provider_entity
             )
-
-
-
-
-
-
-

@@ -3,37 +3,43 @@
   description: 谷歌服务提供商，涵盖了google搜索等工具
   icon: icon.svg
   background: "#E5E7E8"
-  category: 网络搜索
+  category: search
+  created_at: 1759810802
 - name: time
   label: 时间
   description: 一个用于获取当前时间的工具
   icon: icon.svg
   background: "#E5E7E8"
-  category: 实用工具
+  category: tool
+  created_at: 1759810802
 - name: duckduckgo
   label: DuckDuckGo
   description: 这是一个注重隐私的搜索引擎
   icon: icon.svg
   background: "#FFFFFF"
-  category: 网络搜索
+  category: search
+  created_at: 1759810802
 - name: dalle
   label: DALLE
   description: 这是一个用于文生图的工具
   icon: icon.svg
   background: "#E5E7E8"
-  category: 文生图
+  category: image
+  created_at: 1759810802
 - name: gaode
   label: 高德服务提供商
   description: 内置了天气预报和ip查询功能
   icon: icon.svg
   background: "#E5E7E8"
-  category: 实用工具
+  category: tool
+  created_at: 1759810802
 - name: wikipedia
   label: 维基百科
   description: 维基百科是一个由全球的知识分享者创建的免费在线百科全书
   icon: icon.svg
   background: "#E5E7E8"
-  category: 实用工具
+  category: other
+  created_at: 1759810802
 
 
 
