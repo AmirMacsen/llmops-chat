@@ -1,4 +1,4 @@
-name: dalle
+name: dalle3
 label: DALLE-3绘图工具
 description: 一个文生图的工具
 params:
@@ -17,7 +17,7 @@ params:
   - name: style
     label: 图片风格
     type: select
-    required: true
+    required: false
     options:
       - value: vivid
         label: 生动

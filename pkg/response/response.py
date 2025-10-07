@@ -1,22 +1,25 @@
-from dataclasses import field, dataclass
 from typing import Any
 
 from flask import jsonify
+from pydantic import BaseModel, field_serializer
 
 from .http_code import HttpCode
 
 
-@dataclass
-class Response:
+class Response(BaseModel):
     """基础HTTP接口响应格式"""
     code: HttpCode = HttpCode.SUCCESS
     message: str = ""
-    data: Any = field(default_factory=dict)
+    data: Any = {}
+
+    @field_serializer('code')
+    def serialize_code(self, code: HttpCode) -> str:
+        return code.value
 
 
 def json(data: Response = None):
     """基础的响应接口"""
-    return jsonify(data), 200
+    return jsonify(data.model_dump()), 200
 
 
 def success_json(data: Any = None):

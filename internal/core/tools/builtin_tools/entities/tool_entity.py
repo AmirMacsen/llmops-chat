@@ -23,9 +23,23 @@ class ToolParam(BaseModel):
     max: Optional[float] = None
     options: list[dict[str,Any]] = Field(default_factory=list)
 
+    def model_dump(self, *args, **kwargs):
+        # 调用父类的model_dump方法
+        data = super().model_dump(*args, **kwargs)
+        # 将type字段转换为它的值
+        data['type'] = data['type'].value
+        return data
+
 class ToolEntity(BaseModel):
     """工具实体类，映射的是工具名.yaml中的数据"""
     name:str
     label:str
     description:str
     params: list[ToolParam]=Field(default_factory=list)# 工具参数
+
+    def model_dump(self, *args, **kwargs):
+        # 调用父类的model_dump方法
+        data = super().model_dump(*args, **kwargs)
+        # 确保params中的每个ToolParam都正确序列化
+        data['params'] = [param.model_dump(*args, **kwargs) for param in self.params]
+        return data

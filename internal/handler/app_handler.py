@@ -18,7 +18,7 @@ from internal.model import App
 from internal.schema.app_schema import CompletionRequest
 from internal.service import AppService
 from pkg.response import success_json, validate_error_json, success_message
-from internal.core.tools.builtin_tools.providers import ProviderFactory
+from internal.core.tools.builtin_tools.providers import BuiltinProviderManager
 
 
 @inject
@@ -27,7 +27,7 @@ class AppHandler(object):
     """应用处理类"""
 
     app_service: AppService
-    provider: ProviderFactory
+    provider: BuiltinProviderManager
 
     def create_app(self):
         """

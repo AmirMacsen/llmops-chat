@@ -2,7 +2,7 @@ from  dataclasses import dataclass
 
 from flask import Flask, Blueprint
 
-from internal.handler import AppHandler
+from internal.handler import AppHandler, BuiltinToolHandler
 from injector import inject
 
 
@@ -10,6 +10,7 @@ from injector import inject
 @dataclass
 class Router:
     app_handler: AppHandler
+    builtin_tool_handler: BuiltinToolHandler
 
     def register_router(self, app:Flask):
         """注册路由"""
@@ -25,6 +26,11 @@ class Router:
         bp.add_url_rule('/delete_app/<uuid:app_id>', view_func=self.app_handler.delete_app, methods=['POST'])
         bp.add_url_rule('/ping', view_func=self.app_handler.ping)
         bp.add_url_rule('/completion', view_func=self.app_handler.completion, methods=['POST'])
+
+        # 3.内置插件广场模块
+        bp.add_url_rule("/builtin-tools", view_func=self.builtin_tool_handler.get_builtin_tools, methods=['GET'])
+        bp.add_url_rule("/builtin-tools/<string:provider_name>/<string:tool_name>",
+                        view_func=self.builtin_tool_handler.get_provider_tool, methods=['GET'])
 
         # 3. 注册蓝图
         app.register_blueprint(bp)

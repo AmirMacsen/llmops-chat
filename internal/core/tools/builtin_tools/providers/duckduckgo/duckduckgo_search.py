@@ -2,10 +2,14 @@ from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from internal.core.tools.builtin_tools.providers.dalle.dalle3 import DALLE3ArgsSchema
+from internal.lib.helper import add_attribute
+
 
 class DuckDuckGoSearchInput(BaseModel):
     query: str = Field(description="搜索查询语句")
 
+@add_attribute("args_schema", DuckDuckGoSearchInput)
 def duckduckgo_search(**kwargs)->BaseTool:
     """duckduckgo search 工具"""
     return DuckDuckGoSearchRun(
