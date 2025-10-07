@@ -32,7 +32,25 @@ class AppHandler(object):
     def create_app(self):
         """
         创建应用
-        :return:
+        ---
+        tags:
+          - Apps
+        summary: 创建一个新的应用
+        description: 创建一个新的应用实例
+        responses:
+          200:
+            description: 成功创建应用
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    code:
+                      type: integer
+                      example: 200
+                    message:
+                      type: string
+                      example: "应用已经成功创建，id为xxx"
         """
         app = self.app_service.create_app()
         return success_message(f"应用已经成功创建，id为{app.id}")
@@ -40,8 +58,46 @@ class AppHandler(object):
     def get_app(self, app_id:uuid.UUID):
         """
         获取应用
-        :param app_id: 应用id
-        :return:
+        ---
+        tags:
+          - Apps
+        summary: 根据ID获取应用
+        description: 根据应用ID获取特定应用的信息
+        parameters:
+          - name: app_id
+            in: path
+            description: 应用ID
+            required: true
+            schema:
+              type: string
+              format: uuid
+        responses:
+          200:
+            description: 成功获取应用
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    code:
+                      type: integer
+                      example: 200
+                    message:
+                      type: string
+                      example: "应用已经成功找到，名字为xxx"
+          400:
+            description: 请求参数错误
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    code:
+                      type: integer
+                      example: 400
+                    message:
+                      type: string
+                      example: "应用id不能为空"
         """
         if not app_id:
             return validate_error_json(errors={'app_id': '应用id不能为空'})
@@ -53,14 +109,69 @@ class AppHandler(object):
     def update_app(self, app_id:uuid.UUID) -> App:
         """
         更新应用
-        :param app_id: 应用id
-        :return:
+        ---
+        tags:
+          - Apps
+        summary: 更新指定的应用
+        description: 根据应用ID更新特定应用的信息
+        parameters:
+          - name: app_id
+            in: path
+            description: 应用ID
+            required: true
+            schema:
+              type: string
+              format: uuid
+        responses:
+          200:
+            description: 成功更新应用
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    code:
+                      type: integer
+                      example: 200
+                    message:
+                      type: string
+                      example: "应用已经成功更新，名字为xxx"
         """
         app = self.app_service.update_app(app_id)
         return success_message(f"应用已经成功更新，名字为{app.name}")
 
 
     def delete_app(self, app_id:uuid.UUID):
+        """
+        删除应用
+        ---
+        tags:
+          - Apps
+        summary: 删除指定的应用
+        description: 根据应用ID删除特定应用
+        parameters:
+          - name: app_id
+            in: path
+            description: 应用ID
+            required: true
+            schema:
+              type: string
+              format: uuid
+        responses:
+          200:
+            description: 成功删除应用
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    code:
+                      type: integer
+                      example: 200
+                    message:
+                      type: string
+                      example: "应用已经成功删除"
+        """
         self.app_service.delete_app(app_id)
         return success_message(f"应用已经成功删除")
 
@@ -82,6 +193,48 @@ class AppHandler(object):
             configurable_memory.save_context(run_obj.inputs, run_obj.outputs)
 
     def debug(self, app_id: uuid.UUID):
+        """
+        调试聊天接口
+        ---
+        tags:
+          - Apps
+        summary: 调试聊天功能
+        description: 使用特定应用进行聊天调试
+        parameters:
+          - name: app_id
+            in: path
+            description: 应用ID
+            required: true
+            schema:
+              type: string
+              format: uuid
+        requestBody:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query:
+                    type: string
+                    example: "你好"
+        responses:
+          200:
+            description: 成功获取响应
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    code:
+                      type: integer
+                      example: 200
+                    data:
+                      type: object
+                      properties:
+                        content:
+                          type: string
+                          example: "你好！有什么我可以帮你的吗？"
+        """
         """聊天接口"""
         # 1.提取从接口中获取的输入，POST
         req = CompletionRequest()
@@ -118,7 +271,34 @@ class AppHandler(object):
     def completion(self):
         """
         聊天接口
-        :return:
+        ---
+        tags:
+          - Apps
+        summary: 聊天完成接口
+        description: 处理聊天请求并返回AI响应
+        requestBody:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query:
+                    type: string
+                    example: "你好"
+        responses:
+          200:
+            description: 成功获取响应
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    code:
+                      type: integer
+                      example: 200
+                    data:
+                      type: string
+                      example: "你好！有什么我可以帮你的吗？"
         """
         req = CompletionRequest()
         if not req.validate():
@@ -134,6 +314,29 @@ class AppHandler(object):
         return success_json(parsed_message)
 
     def ping(self):
+        """
+        测试接口
+        ---
+        tags:
+          - Utils
+        summary: Ping测试接口
+        description: 测试接口连通性并返回提供商实体列表
+        responses:
+          200:
+            description: 成功响应
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    code:
+                      type: integer
+                      example: 200
+                    data:
+                      type: array
+                      items:
+                        type: object
+        """
         """测试方法"""
         entities = self.provider.get_provider_entities()
         return success_json({"ping": [p.dict() for p in entities]})

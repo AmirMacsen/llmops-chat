@@ -3,6 +3,7 @@ import os
 from flask import Flask
 from flask_migrate import Migrate
 from flask_cors import CORS
+from flasgger import Swagger
 
 from config import Config
 from internal.exception import CustomException
@@ -25,6 +26,17 @@ class Http(Flask):
 
         # 加载配置
         self.config.from_object(config)
+
+        # 初始化Swagger
+        self.config['SWAGGER'] = {
+            'title': 'LlmOps API',
+            'uiversion': 3,
+            'openapi': '3.0.2',
+            'version': '1.0.0',
+            'description': 'LlmOps API Documentation',
+            'termsOfService': ''
+        }
+        self.swagger = Swagger(self)
 
         # 异常处理
         self.register_error_handler(Exception, self._register_error_handler)
