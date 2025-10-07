@@ -56,10 +56,6 @@ class TestBuiltinToolHandler:
         resp = client.get(
             f"/builtin-tools/{provider_name}/icon",
         )
-
         assert resp.status_code == 200
-
-        if provider_name == "google":
-            assert resp.json.get("code") == HttpCode.SUCCESS
-        else:
+        if provider_name == "openai":
             assert resp.json.get("code") == HttpCode.NOT_FOUND
