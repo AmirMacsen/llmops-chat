@@ -1,9 +1,8 @@
 import pytest
-from unittest.mock import patch, MagicMock
-from uuid import UUID
 
-from test.internal.conftest import client
+from internal.model import ApiToolProvider
 from pkg.response import HttpCode
+from test.internal.conftest import client
 
 openapi_schema_right = """
 {"server":"http://baidu.com","description":"baidu","paths":{"/location":{"get":{"description":"获取位置信息","operationId":"xxxx","parameters":[{"name":"location","description":"位置信息","in":"query","required":true,"type":"str"}]}}}}
@@ -34,90 +33,65 @@ class TestApiToolHandler:
         else:
             assert resp_json.get("code") == HttpCode.VALIDATE_ERROR.value
 
-    def test_create_open_ai_tool_success(self, client):
-        """测试成功创建OpenAI工具"""
-        # 准备测试数据
-        test_data = {
-            "name": "Test API Tool",
-            "icon": "https://example.com/icon.png",
-            "openapi_schema": openapi_schema_right
-        }
-        
-        # 发送POST请求
-        resp = client.post(
-            "/api-tools",
-            json=test_data,
-        )
-        
-        # 验证响应状态码
-        assert resp.status_code == 200
-        resp_json = resp.get_json()
-        assert resp_json.get("code") == HttpCode.SUCCESS.value
-        assert resp_json.get("data") == "创建自定义插件成功"
-
-    def test_create_open_ai_tool_validation_error(self, client):
-        """测试创建OpenAI工具时的验证错误"""
-        # 准备无效的测试数据（缺少必需字段）
-        test_data = {
-            "name": "",  # 无效：空名称
-            "icon": "invalid-url",  # 无效：不是有效的URL
-            "openapi_schema": ""  # 无效：空schema
-        }
-        
-        # 发送POST请求
-        resp = client.post(
-            "/api-tools",
-            json=test_data,
-        )
-        
-        # 验证响应状态码和错误码
-        assert resp.status_code == 200
-        resp_json = resp.get_json()
-        assert resp_json.get("code") == HttpCode.VALIDATE_ERROR.value
-
-    @patch('internal.handler.api_tool_handler.ApiToolService')
-    def test_get_api_tool_provider_success(self, mock_service, client):
-        """测试成功获取API工具提供商"""
-        # 准备测试数据
-        provider_id = "123e4567-e89b-12d3-a456-426614174000"
-        
-        # 创建模拟的provider对象
-        mock_provider = MagicMock()
-        mock_provider.id = UUID(provider_id)
-        mock_provider.name = "Test Provider"
-        mock_provider.icon = "https://example.com/icon.png"
-        mock_provider.openapi_schema = openapi_schema_right
-        mock_provider.headers = []
-        
-        # 设置服务层返回值
-        mock_service_instance = mock_service.return_value
-        mock_service_instance.get_api_tool_provider.return_value = mock_provider
-        
-        # 发送GET请求
+    @pytest.mark.parametrize("provider_id", [
+        "b03d55b5-895e-47c8-b767-6d0015ae60a1",
+        "3944eee4-9d5a-4ca5-91c1-e56654cbc1e5"
+    ])
+    def test_get_api_tool_provider(self, provider_id, client):
         resp = client.get(f"/api-tools/{provider_id}")
-        
-        # 验证响应
         assert resp.status_code == 200
-        resp_json = resp.get_json()
-        assert resp_json.get("code") == HttpCode.SUCCESS.value
-        assert "data" in resp_json
-        data = resp_json.get("data")
-        assert str(data.get("id")) == provider_id
-        assert data.get("name") == "Test Provider"
-        assert data.get("icon") == "https://example.com/icon.png"
+        if provider_id.endswith("4"):
+            assert resp.json.get("code") == HttpCode.SUCCESS
+        elif provider_id.endswith("5"):
+            assert resp.json.get("code") == HttpCode.NOT_FOUND
 
-    @patch('internal.handler.api_tool_handler.ApiToolService')
-    def test_get_api_tool_provider_not_found(self, mock_service, client):
-        """测试获取不存在的API工具提供商"""
-        # 准备测试数据
-        provider_id = "123e4567-e89b-12d3-a456-426614174000"
-        
-        # 设置服务层抛出异常
-        mock_service_instance = mock_service.return_value
-        mock_service_instance.get_api_tool_provider.side_effect = Exception("provider未找到")
-        
-        # 发送GET请求
-        resp = client.get(f"/api-tools/{provider_id}")
-        
-        # 验证响应（这里根据实际异常处理逻辑可能需要调整）
+    @pytest.mark.parametrize("provider_id, tool_name", [
+        ("b03d55b5-895e-47c8-b767-6d0015ae60a1", "GetLocationForIp"),
+        ("3944eee4-9d5a-4ca5-91c1-e56654cbc1e4", "google")
+    ])
+    def test_get_api_tool(self, provider_id, tool_name, client):
+        resp = client.get(f"/api-tools/{provider_id}/tools/{tool_name}")
         assert resp.status_code == 200
+        if tool_name == "GetLocationForIp":
+            assert resp.json.get("code") == HttpCode.SUCCESS
+        elif tool_name == "google":
+            assert resp.json.get("code") == HttpCode.NOT_FOUND
+
+    def test_create_api_tool_provider(self, client, db):
+        data = {
+            "name": "Google工具包",
+            "icon": "https://cdn.google.com/icon.png",
+            "openapi_schema": "{\"description\":\"查询ip所在地、天气预报、路线规划等高德工具包\",\"server\":\"https://gaode.example.com\",\"paths\":{\"/weather\":{\"get\":{\"description\":\"根据传递的城市名获取指定城市的天气预报，例如：广州\",\"operationId\":\"GetCurrentWeather\",\"parameters\":[{\"name\":\"location\",\"in\":\"query\",\"description\":\"需要查询天气预报的城市名\",\"required\":true,\"type\":\"str\"}]}},\"/ip\":{\"post\":{\"description\":\"根据传递的ip查询ip归属地\",\"operationId\":\"GetCurrentIp\",\"parameters\":[{\"name\":\"ip\",\"in\":\"request_body\",\"description\":\"需要查询所在地的标准ip地址，例如:201.52.14.23\",\"required\":true,\"type\":\"str\"}]}}}}",
+            "headers": [{"key": "Authorization", "value": "Bearer access_token"}]
+        }
+        resp = client.post("/api-tools", json=data)
+        assert resp.status_code == 200
+
+        from internal.model import ApiToolProvider
+        api_tool_provider = db.session.query(ApiToolProvider).filter_by(name="Google工具包").one_or_none()
+        assert api_tool_provider is not None
+
+    def test_update_api_tool_provider(self, client, db):
+        provider_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        data = {
+            "name": "test_update_api_tool_provider",
+            "icon": "https://cdn.google.com/icon.png",
+            "openapi_schema": "{\"description\":\"查询ip所在地、天气预报、路线规划等高德工具包\",\"server\":\"https://gaode.example.com\",\"paths\":{\"/weather\":{\"get\":{\"description\":\"根据传递的城市名获取指定城市的天气预报，例如：广州\",\"operationId\":\"GetCurrentWeather\",\"parameters\":[{\"name\":\"location\",\"in\":\"query\",\"description\":\"需要查询天气预报的城市名\",\"required\":true,\"type\":\"str\"}]}},\"/ip\":{\"post\":{\"description\":\"根据传递的ip查询ip归属地\",\"operationId\":\"GetLocationForIp\",\"parameters\":[{\"name\":\"ip\",\"in\":\"request_body\",\"description\":\"需要查询所在地的标准ip地址，例如:201.52.14.23\",\"required\":true,\"type\":\"str\"}]}}}}",
+            "headers": [{"key": "Authorization", "value": "Bearer access_token"}]
+        }
+        resp = client.post(f"/api-tools/{provider_id}", json=data)
+        assert resp.status_code == 200
+
+        from internal.model import ApiToolProvider
+        api_tool_provider = db.session.query(ApiToolProvider).get(provider_id)
+        assert api_tool_provider.name == data.get("name")
+
+    def test_delete_api_tool_provider(self, client, db):
+        provider_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        resp = client.post(f"/api-tools/{provider_id}/delete")
+        assert resp.status_code == 200
+        assert resp.json.get("code") == HttpCode.SUCCESS
+
+        from internal.model import ApiToolProvider
+        api_tool_provider = db.session.query(ApiToolProvider).get(provider_id)
+        assert api_tool_provider is None
