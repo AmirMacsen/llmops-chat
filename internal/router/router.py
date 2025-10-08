@@ -2,7 +2,7 @@ from  dataclasses import dataclass
 
 from flask import Flask, Blueprint
 
-from internal.handler import AppHandler, BuiltinToolHandler
+from internal.handler import AppHandler, BuiltinToolHandler, ApiToolHandler
 from injector import inject
 
 
@@ -11,6 +11,7 @@ from injector import inject
 class Router:
     app_handler: AppHandler
     builtin_tool_handler: BuiltinToolHandler
+    api_tool_handler: ApiToolHandler
 
     def register_router(self, app:Flask):
         """注册路由"""
@@ -38,5 +39,34 @@ class Router:
         bp.add_url_rule('/builtin-tools/categories',
                         view_func=self.builtin_tool_handler.get_categories,
                         methods=['GET'])
+
+        # 4. 自定义API插件模块
+        bp.add_url_rule("/api-tools",
+                        methods=["GET"],
+                        view_func=self.api_tool_handler.get_api_tool_providers_with_page)
+
+        bp.add_url_rule("/api-tools/<uuid:provider_id>/update",
+                        methods=["POST"],
+                        view_func=self.api_tool_handler.update_api_tool_provider)
+
+        bp.add_url_rule("/api-tools/validate-openapi-schema",
+                        methods=["POST"],
+                        view_func=self.api_tool_handler.validate_open_ai_schema)
+
+        bp.add_url_rule("/api-tools",
+                        methods=["POST"],
+                        view_func=self.api_tool_handler.create_open_api_tool_provider)
+
+        bp.add_url_rule("/api-tools/<uuid:provider_id>",
+                        methods=["GET"],
+                        view_func=self.api_tool_handler.get_api_tool_provider)
+
+        bp.add_url_rule("/api-tools/<uuid:provider_id>/<string:tool_name>",
+                        methods=["GET"],
+                        view_func=self.api_tool_handler.get_api_tool)
+
+        bp.add_url_rule("/api-tools/<uuid:provider_id>/delete",
+                        methods=["POST"],
+                        view_func=self.api_tool_handler.delete_api_tool_provider)
         # 3. 注册蓝图
         app.register_blueprint(bp)

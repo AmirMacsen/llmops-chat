@@ -1,6 +1,3 @@
-import datetime
-import uuid
-
 from sqlalchemy import (
     Column,
     UUID,
