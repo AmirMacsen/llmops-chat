@@ -11,15 +11,27 @@ class ParameterIn(str,Enum):
     PATH = "path"
     HEADER = "header"
     COOKIE = "cookie"
+    REQUEST_BODY = "body"
 
 
 class ParameterType(str,Enum):
     """参数类型枚举"""
     STRING = "str"
-    NUMBER = "number"
+    Float = "float"
     BOOLEAN = "boolean"
     ARRAY = "array"
     OBJECT = "object"
+    INT = "int"
+
+
+ParameterTypeMap = {
+    ParameterType.STRING: str,
+    ParameterType.Float: float,
+    ParameterType.BOOLEAN: bool,
+    ParameterType.ARRAY: list,
+    ParameterType.OBJECT: dict,
+    ParameterType.INT: int
+}
 
 
 class OpenAPISchema(BaseModel):

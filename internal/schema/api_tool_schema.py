@@ -143,7 +143,7 @@ class GetApiToolResponse(Schema):
             "name": data.name,
             "description": data.description,
             "inputs": [{k:v for k,v in params.items() if k != "in"} for params in data.parameters],
-            "provider": {
+            "providers": {
                 "id": provider_info.id,
                 "name": provider_info.name,
                 "icon": provider_info.icon,

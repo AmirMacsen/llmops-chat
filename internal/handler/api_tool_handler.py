@@ -371,7 +371,7 @@ class ApiToolHandler:
                           description: 工具参数列表
                           items:
                             type: object
-                        provider:
+                        providers:
                           type: object
                           description: 工具提供者信息
                           properties:

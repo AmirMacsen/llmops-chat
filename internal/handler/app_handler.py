@@ -16,7 +16,7 @@ from langchain_openai import ChatOpenAI
 
 from internal.model import App
 from internal.schema.app_schema import CompletionRequest
-from internal.service import AppService
+from internal.service import AppService, ApiToolService
 from pkg.response import success_json, validate_error_json, success_message
 from internal.core.tools.builtin_tools.providers import BuiltinProviderManager
 
@@ -28,6 +28,7 @@ class AppHandler(object):
 
     app_service: AppService
     provider: BuiltinProviderManager
+    api_tool_service: ApiToolService
 
     def create_app(self):
         """
@@ -338,5 +339,7 @@ class AppHandler(object):
                         type: object
         """
         """测试方法"""
-        entities = self.provider.get_provider_entities()
-        return success_json({"ping": [p.dict() for p in entities]})
+        # entities = self.provider.get_provider_entities()
+
+        # return success_json({"ping": [p.dict() for p in entities]})
+        return self.api_tool_service.api_tool_invoke()

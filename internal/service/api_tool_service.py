@@ -6,7 +6,7 @@ from uuid import UUID
 from injector import inject
 from sqlalchemy import desc
 
-from internal.core.tools.api_tools.entities import OpenAPISchema
+from internal.core.tools.api_tools.entities import OpenAPISchema, ToolEntity
 from internal.exception import ValidationException, NotFoundException
 from internal.model import ApiTool, ApiToolProvider
 from internal.schema.api_tool_schema import CreateOpenAPIToolSchemaRequest, GetApiToolProvidersWithPageRequest, \
@@ -14,6 +14,7 @@ from internal.schema.api_tool_schema import CreateOpenAPIToolSchemaRequest, GetA
 from internal.service.base_service import BaseService
 from pkg.paginator import Paginator
 from pkg.sqlalchemy import SQLAlchemy
+from internal.core.tools.api_tools.providers import ApiProviderManager
 
 
 @inject
@@ -21,6 +22,7 @@ from pkg.sqlalchemy import SQLAlchemy
 class ApiToolService(BaseService):
     """自定义API插件服务"""
     db: SQLAlchemy # 注入数据库
+    api_provider_manager: ApiProviderManager
 
     @classmethod
     def parse_openapi_schema(cls, openapi_schema_str:str) -> OpenAPISchema:
@@ -178,5 +180,32 @@ class ApiToolService(BaseService):
                     method=method.upper(),
                     parameters=method_item.get("parameters",[])
                 )
+
+
+    def api_tool_invoke(self):
+        provider_id = "166e64f7-e81a-4f59-af26-9f398cc42ebc"
+        tool_name = "YouDaoSuggest"
+
+        api_tool = self.db.session.query(ApiTool).filter(
+            ApiToolProvider.id == provider_id,
+            ApiTool.name == tool_name
+        ).one_or_none()
+        if api_tool is None:
+            raise NotFoundException("工具未找到")
+
+        api_tool_provider = api_tool.provider
+
+        tool_entity = ToolEntity(
+            id=str(api_tool_provider.id),
+            name=api_tool_provider.name,
+            url=api_tool.url,
+            method=api_tool.method,
+            description=api_tool.description,
+            headers=api_tool_provider.headers,
+            parameters=api_tool.parameters
+        )
+
+        tool = self.api_provider_manager.get_tool(tool_entity)
+        return tool.invoke({"q": "love", "doctype": "json"})
 
 
