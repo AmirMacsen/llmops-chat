@@ -17,6 +17,7 @@ from langchain_openai import ChatOpenAI
 from internal.model import App
 from internal.schema.app_schema import CompletionRequest
 from internal.service import AppService, ApiToolService
+from internal.task.demo_task import demo_task
 from pkg.response import success_json, validate_error_json, success_message
 from internal.core.tools.builtin_tools.providers import BuiltinProviderManager
 
@@ -342,4 +343,7 @@ class AppHandler(object):
         # entities = self.provider.get_provider_entities()
 
         # return success_json({"ping": [p.dict() for p in entities]})
+
+        # 调用异步任务
+        demo_task.delay(uuid.uuid4())
         return self.api_tool_service.api_tool_invoke()

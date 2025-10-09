@@ -10,7 +10,8 @@ from internal.exception import CustomException
 from internal.router import Router
 from pkg.response import Response, json, HttpCode
 from pkg.sqlalchemy import SQLAlchemy
-from internal.extension.logging_extension import  init_app
+from internal.extension import logging_extension, redis_extension, celery_extension
+
 
 class Http(Flask):
     """http服务器"""
@@ -45,8 +46,13 @@ class Http(Flask):
         db.init_app(self)
         migrate.init_app(self, db, directory='internal/migrations')
 
+        # redis
+        redis_extension.init_app(self)
+        # celery
+        celery_extension.init_app(self)
+
         # 日志
-        init_app(self)
+        logging_extension.init_app(self)
 
         # 解决前后端跨域问题
         CORS(self, resources={r"/*": {

@@ -190,8 +190,8 @@ class ApiToolService(BaseService):
         tool_name = "YouDaoSuggest"
 
         api_tool = self.db.session.query(ApiTool).filter(
-            ApiToolProvider.id == provider_id,
-            ApiTool.name == tool_name
+            ApiTool.provider_id == provider_id,
+            ApiTool.name == tool_name,
         ).one_or_none()
         if api_tool is None:
             raise NotFoundException("工具未找到")
