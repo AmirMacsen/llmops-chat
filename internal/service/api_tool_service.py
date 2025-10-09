@@ -34,7 +34,9 @@ class ApiToolService(BaseService):
                 raise
         except:
             raise ValidationException("数据必须符合openapi规范")
-        return OpenAPISchema(**data)
+
+        response = OpenAPISchema(**data)
+        return response
 
     def get_api_tool_providers_with_page(self, req:GetApiToolProvidersWithPageRequest)->tuple[list[Any], Paginator]:
         """获取自定义API工具提供者的列表"""
@@ -84,6 +86,7 @@ class ApiToolService(BaseService):
             name=req.name.data,
             icon=req.icon.data,
             headers=req.headers.data,
+            description=openapi_schema.description,
             openapi_schema=req.openapi_schema.data,
         )
 
