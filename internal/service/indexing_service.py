@@ -4,7 +4,9 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
+from concurrent.futures import ThreadPoolExecutor
 
+from flask import Flask, current_app
 from injector import inject
 from langchain_core.documents import Document as LCDocument
 from sqlalchemy import func
@@ -195,24 +197,45 @@ class IndexingService(BaseService):
             lc_segment.metadata["segment_enabled"] = True
 
         # 调用向量数据库，每次存储10条数据
-        for i in range(0, len(lc_segments), 10):
-            # 提取存储的数据
-            chunks = lc_segments[i:i+10]
-            ids = [chunk.metadata["node_id"] for chunk in chunks]
+        def thread_function(flask_app:Flask, chunks:list[LCDocument], ids:list[UUID])-> None:
+            """线程函数，执行向量数据库和pg数据库存储"""
+            with flask_app.app_context():
+                try:
+                    # 调用向量数据库存储
+                    self.vector_database_service.vector_store.add_documents(
+                        chunks,
+                        ids=ids,
+                    )
+                    # 更新片段数据
+                    with self.db.auto_commit():
+                        self.db.session.query(Segment).filter(
+                            Segment.node_id.in_(ids)
+                        ).update({
+                            "status": SegmentStatus.COMPLETED,
+                            'completed_at': datetime.now(),
+                            "enabled": True
+                        })
+                except Exception as e:
+                    logging.exception(f"构建索引失败，错误信息：{str(e)}")
+                    with self.db.auto_commit():
+                        self.db.session.query(Segment).filter(
+                            Segment.node_id.in_(ids)
+                        ).update({
+                            "status": SegmentStatus.ERROR,
+                            'completed_at': None,
+                            "stopped_at": datetime.now(),
+                            "enabled": False
+                        })
 
-            # 调用向量数据库存储
-            self.vector_database_service.vector_store.add_documents(
-                chunks,
-                ids=ids,
-            )
-            # 更新片段数据
-            self.db.session.query(Segment).filter(
-                Segment.node_id.in_(ids)
-            ).update({
-                "status": SegmentStatus.COMPLETED,
-                'completed_at': datetime.now(),
-                "enabled": True
-            })
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = []
+            for i in range(0, len(lc_segments), 10):
+                chunks = lc_segments[i:i + 10]
+                ids = [chunk.metadata["node_id"] for chunk in chunks]
+                futures.append(executor.submit(thread_function, current_app._get_current_object(), chunks, ids))
+
+            for future in futures:
+                future.result()
 
         # 更新文档数据
         self.update(

@@ -1,14 +1,16 @@
 from flask_wtf import FlaskForm
 from marshmallow import Schema, fields, pre_dump
 from wtforms import StringField
-from wtforms.validators import DataRequired, AnyOf, Optional
+from wtforms.validators import DataRequired, AnyOf, Optional, Length
 from uuid import UUID
 
 from internal.entity.dataset_entity import DocumentProcessType, DEFAULT_PROCESS_RULE
+from internal.lib.helper import datetime_to_timestamp
 from internal.model import Document
 from internal.schema import ListField
 from internal.schema.schema import DictField
 from internal.exception import ValidationException
+from pkg.paginator import PaginatorRequest
 
 
 class CreateDocumentsRequest(FlaskForm):
@@ -120,4 +122,85 @@ class CreateDocumentsResponse(Schema):
                 "created_at": int(document.created_at.timestamp()),
             } for document in data[0]],
             "batch": data[1]
+        }
+
+
+class GetDocumentResponse(Schema):
+    """获取文档响应"""
+    id = fields.UUID(dump_default="")
+    dataset_id = fields.UUID(dump_default="")
+    name = fields.String(dump_default="")
+    segment_count = fields.Integer(dump_default=0)
+    character_count = fields.Integer(dump_default=0)
+    hit_count = fields.Integer(dump_default=0)
+    position = fields.Integer(dump_default=0)
+    enabled = fields.Boolean(dump_default=False)
+    disabled_at = fields.Integer(dump_default=0)
+    status = fields.String(dump_default="")
+    error = fields.String(dump_default="")
+    created_at = fields.Integer(dump_default=0)
+    updated_at = fields.Integer(dump_default=0)
+
+    @pre_dump
+    def process_data(self, data: Document, **kwargs):
+        return {
+            "id": data.id,
+            "dataset_id": data.dataset_id,
+            "name": data.name,
+            "segment_count": data.segment_count,
+            "character_count": data.character_count,
+            "hit_count": data.hit_count,
+            "position": data.position,
+            "enabled": data.enabled,
+            "disabled_at": datetime_to_timestamp(data.disabled_at),
+            "status": data.status,
+            "error": data.error,
+            "created_at": datetime_to_timestamp(data.created_at),
+            "updated_at": datetime_to_timestamp(data.updated_at),
+        }
+
+class UpdateDocumentNameRequest(FlaskForm):
+    """更新文档名称请求"""
+    name = StringField("name", validators=[
+        DataRequired(message="名称不能为空"),
+        Length(max=100, message="名称长度不能超过100")
+    ])
+
+
+class GetDocumentsWithPageRequest(PaginatorRequest):
+    """获取文档分页请求"""
+    search_word = StringField("search_word", default="", validators=[
+        Optional(),
+    ])
+
+
+class GetDocumentsWithPageResponse(Schema):
+    """获取文档分页响应"""
+    id =fields.UUID(dump_default="")
+    name = fields.String(dump_default="")
+    charactor_count = fields.Integer(dump_default=0)
+    hit_count = fields.Integer(dump_default=0)
+    position = fields.Integer(dump_default=0)
+    enabled = fields.Boolean(dump_default=False)
+    disabled_at = fields.Integer(dump_default=0)
+    status = fields.String(dump_default="")
+    error = fields.String(dump_default="")
+    created_at = fields.Integer(dump_default=0)
+    updated_at = fields.Integer(dump_default=0)
+
+
+    @pre_dump
+    def process_data(self, data: Document, **kwargs):
+        return {
+            "id": data.id,
+            "name": data.name,
+            "character_count": data.character_count,
+            "hit_count": data.hit_count,
+            "position": data.position,
+            "enabled": data.enabled,
+            "disabled_at": datetime_to_timestamp(data.disabled_at),
+            "status": data.status,
+            "error": data.error,
+            "created_at": datetime_to_timestamp(data.created_at),
+            "updated_at": datetime_to_timestamp(data.updated_at),
         }

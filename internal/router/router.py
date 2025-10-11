@@ -95,5 +95,17 @@ class Router:
         # 文档
         bp.add_url_rule("/datasets/<uuid:dataset_id>/documents", methods=["POST"],
                         view_func=self.document_handler.create_documents)
+        bp.add_url_rule("/datasets/<uuid:dataset_id>/documents/batch/<string:batch>", methods=["GET"],
+                        view_func=self.document_handler.get_documents_status)
+        bp.add_url_rule("/datasets/<uuid:dataset_id>/documents", methods=["GET"],
+                        view_func=self.document_handler.get_document_with_page)
+        bp.add_url_rule("/datasets/<uuid:dataset_id>/documents/<uuid:document_id>", methods=["GET"],
+                        view_func=self.document_handler.get_document)
+        bp.add_url_rule("/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/name", methods=["POST"],
+                        view_func=self.document_handler.update_document_name)
+
+        # 召回
+        bp.add_url_rule("/datasets/<uuid:dataset_id>/hit", methods=["POST"],
+                        view_func=self.dataset_handler.hit)
         # 3. 注册蓝图
         app.register_blueprint(bp)
