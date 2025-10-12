@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from marshmallow import Schema, fields, pre_dump
-from wtforms import StringField
+from wtforms import StringField, BooleanField
 from wtforms.validators import DataRequired, AnyOf, Optional, Length
 from uuid import UUID
 
@@ -204,3 +204,12 @@ class GetDocumentsWithPageResponse(Schema):
             "created_at": datetime_to_timestamp(data.created_at),
             "updated_at": datetime_to_timestamp(data.updated_at),
         }
+
+class UpdateDocumentEnabledRequest(FlaskForm):
+    """更新文档启用状态请求"""
+    enabled = BooleanField("enabled")
+
+    def validate_enabled(self, field:BooleanField)->None:
+        """校验字段"""
+        if not isinstance(field.data, bool):
+            raise ValidationException("enabled格式错误")

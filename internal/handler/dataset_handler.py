@@ -36,7 +36,7 @@ class DatasetHandler:
 
     def hit(self, dataset_id:UUID):
         """文档召回测试"""
-        query="LLM inference"
+        query="Allows you to animate without code. Don't need to use this if you plan to start the animation in code."
         retriever = self.vector_database_service.vector_store.as_retriever(
             search_type="mmr",
             search_kwargs={

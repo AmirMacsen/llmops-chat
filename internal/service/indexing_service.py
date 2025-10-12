@@ -10,9 +10,14 @@ from flask import Flask, current_app
 from injector import inject
 from langchain_core.documents import Document as LCDocument
 from sqlalchemy import func
+from redis import Redis
+from weaviate.classes.query import Filter
 
 from internal.core.file_extractor import FileExtractor
+from internal.entity.cache_entity import LOCK_DOCUMENT_UPDATE_ENABLED, LOCK_KEYWORD_TABLE_UPDATE_KEYWORD_TABLE, \
+    LOCK_EXPIRE
 from internal.entity.dataset_entity import DocumentStatus, SegmentStatus
+from internal.exception import NotFoundException
 from internal.lib.helper import generate_text_hash
 from internal.model import Document, Segment
 from internal.service import EmbeddingsService
@@ -36,6 +41,7 @@ class IndexingService(BaseService):
     jieba_service: JiebaService
     keyword_table_service: KeywordTableService
     vector_database_service: VectorDatabaseService
+    redis_client: Redis
 
     def build_documents(self, document_ids:list[UUID]) -> None:
         """根据文档id构建Document"""
@@ -74,6 +80,74 @@ class IndexingService(BaseService):
                     error=str(e),
                     stopped_at=datetime.now(),
                 )
+
+
+    def update_document_enabled(self, document_id:UUID) -> None:
+        """根据传递的文档id更新文档状态+向量库"""
+        # 构建缓存键
+        cache_key = LOCK_DOCUMENT_UPDATE_ENABLED.format(document_id=document_id)
+
+        # 根据传递的document id获取文档记录
+        document = self.get(Document, document_id)
+        if not document:
+            logging.exception(f"当前文档不存在，文档id: {document_id}")
+            raise NotFoundException("文档不存在")
+
+        # 查找当前归属于文档的所有片段节点ID
+        segments = self.db.session.query(Segment.id, Segment.node_id, Segment.enabled).filter(
+            Segment.document_id == document_id,
+            Segment.status == SegmentStatus.COMPLETED
+        ).all()
+        segment_ids = [
+            segment_id for segment_id,_, _ in segments
+        ]
+        node_ids = [
+            node_id for _, node_id, _ in segments
+        ]
+
+        # 执行循环遍历所有node_ids并更新向量数据库
+        try:
+            connect = self.vector_database_service.collection
+            for node_id in node_ids:
+                try:
+                    connect.data.update(
+                        uuid=node_id,
+                        properties={
+                            "document_enabled": document.enabled
+                        }
+                    )
+                except Exception as e:
+                    with self.db.auto_commit():
+                        self.db.session.query(Segment).filter(
+                            Segment.node_id == node_id
+                        ).update({
+                            "status": SegmentStatus.ERROR,
+                            "error": str(e),
+                            "stopped_at": datetime.now(),
+                            "enabled": False,
+                            "disabled_at": datetime.now()
+                        })
+
+            # 更新关键词表对应的数据（enabled为false表示从关键词表中删除数据，enabled为true表示从关键词表中新增数据）
+            if document.enabled is True:
+                # 从禁用改为启用, 需要更新关键词表
+                enabled_segment_ids = [id for id, _, enabled in segments if enabled is True]
+                self.keyword_table_service.add_keyword_table_from_ids(document.dataset_id, enabled_segment_ids)
+            else:
+                # 从启用改为禁用, 需要剔除关键词
+                self.keyword_table_service.delete_keyword_table_from_ids(document.dataset_id, segment_ids)
+
+        except Exception as e:
+            logging.exception(f"更新文档向量库发生错误，错误信息： {str(e)}")
+            # 修改状态为原来的状态
+            _enabled = not document.enabled
+            self.update(
+                document,
+                enabled=_enabled,
+                disabled_at=None if _enabled else datetime.now(),
+            )
+        finally:
+            self.redis_client.delete(cache_key)
 
     def _parsing(self, document:Document) -> list[LCDocument]:
         """解析文档"""
@@ -176,10 +250,14 @@ class IndexingService(BaseService):
                     keyword_table[keyword] = set()
                 keyword_table[keyword].add(lc_segment.metadata["segment_id"])
 
-            # 更新关键词表
+            # 更新关键词表，确保所有值都是list类型而不是set类型
+            keyword_table_for_update = {}
+            for field, value in keyword_table.items():
+                keyword_table_for_update[field] = list(value)
+
             self.update(
                 keyword_table_record,
-                keyword_table={field:list(value) for field, value in keyword_table.items()}
+                keyword_table=keyword_table_for_update
             )
 
         # 更新文档数据
@@ -246,6 +324,28 @@ class IndexingService(BaseService):
         )
 
 
+    def delete_document(self, dataset_id:UUID, document_id:UUID)->None:
+        """根据dataset_id和document_id删除文档"""
+        # 查找该文档下的文档片段
+        segment_ids = [
+            str(id) for id, in self.db.session.query(Segment.id).filter(
+                Segment.document_id == document_id
+            ).all()
+        ]
+        # 调用向量数据库删除关联记录
+        connection = self.vector_database_service.collection
+        connection.data.delete_many(
+            where=Filter.by_property("document_id").equal(document_id)
+        )
+        # 删除pg中的数据
+        with self.db.auto_commit():
+            self.db.session.query(Segment).filter(
+                Segment.document_id == document_id
+            ).delete()
+
+
+        # 删除关键词表数据和向量数据库中的数据
+        self.keyword_table_service.delete_keyword_table_from_ids(dataset_id, segment_ids)
 
     @classmethod
     def _clean_extra_text(cls, text: str) -> str:

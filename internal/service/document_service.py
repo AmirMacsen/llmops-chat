@@ -1,20 +1,24 @@
 import logging
 import random
 import time
+from datetime import datetime
 from uuid import UUID
 
 from injector import inject
 from dataclasses import dataclass
 
+from redis import Redis
 from sqlalchemy import desc, asc, func
 
-from internal.entity.dataset_entity import DocumentProcessType, SegmentStatus
+from internal.entity.cache_entity import LOCK_DOCUMENT_UPDATE_ENABLED, LOCK_EXPIRE
+from internal.entity.dataset_entity import DocumentProcessType, SegmentStatus, DocumentStatus
 from internal.entity.upload_file_entity import ALLOW_FILE_EXTENSIONS
 from internal.lib.helper import datetime_to_timestamp
 from internal.model import Document, Dataset, UploadFile, ProcessRule, Segment
 from internal.schema.document_schema import GetDocumentsWithPageRequest
 from internal.service.base_service import BaseService
 from internal.task import document_task
+from internal.task.document_task import update_document_enabled, delete_document
 from pkg.paginator import Paginator
 from pkg.sqlalchemy import SQLAlchemy
 from internal.exception import NotFoundException, ForbiddenException, FailedException
@@ -25,6 +29,7 @@ from internal.exception import NotFoundException, ForbiddenException, FailedExce
 class DocumentService(BaseService):
     """文档服务"""
     db: SQLAlchemy
+    redis_client: Redis
 
     def create_document(self, dataset_id: UUID,
                         upload_file_ids: list[UUID],
@@ -202,6 +207,73 @@ class DocumentService(BaseService):
             raise ForbiddenException("文档不属于该知识库")
 
         return self.update(document, **kwargs)
+
+    def update_document_enabled(self, dataset_id: UUID, document_id: UUID, enabled: bool) -> Document:
+        """更新文档启用状态"""
+        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        # 权限检测
+        dataset = self.get(Dataset, dataset_id)
+        if not dataset or str(dataset.account_id) != account_id:
+            raise ForbiddenException("知识库不存在")
+
+        # 获取文档并校验权限
+        document = self.get(Document, document_id)
+        if document is None:
+            raise NotFoundException("文档不存在")
+
+        if document.dataset_id != dataset_id or str(document.account_id) != account_id:
+            raise ForbiddenException("文档不属于该知识库")
+
+        # 判断文档是否属于可以修改的状态，只有构建完成才能修改
+        if document.status != DocumentStatus.COMPLETED:
+            raise ForbiddenException("文档正在处理中，暂时无法修改")
+
+        # 判断当前的文档的启用状态是否与当前传递的启用状态相反（如果相同，没必要处理，太废资源）
+        if document.enabled == enabled:
+            raise ForbiddenException(f"文档已处于该状态 {'启用' if enabled else '禁用'}")
+
+        # 构建缓存锁名字，并检测是否上锁
+        cache_key = LOCK_DOCUMENT_UPDATE_ENABLED.format(document_id=document_id)
+        cache_result = self.redis_client.get(cache_key)
+        if cache_result:
+            raise ForbiddenException("文档正在处理中，请稍后再试")
+
+        # 修改文档的启用状态并设置缓存锁
+        self.update(document, enabled=enabled, disabled_at=datetime.now() if not enabled else None)
+        self.redis_client.setex(cache_key, LOCK_EXPIRE, 1)
+
+        # 启用异步任务完成后续操作
+        update_document_enabled.delay(document.id)
+        return document
+
+
+    def delete_document(self, dataset_id: UUID, document_id: UUID) -> Document:
+        """删除文档 【文档、片段删除、词表更新、weaviate向量删除】"""
+        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        # 权限检测
+        dataset = self.get(Dataset, dataset_id)
+        if not dataset or str(dataset.account_id) != account_id:
+            raise ForbiddenException("知识库不存在")
+
+        # 获取文档并校验权限
+        document = self.get(Document, document_id)
+        if document is None:
+            raise NotFoundException("文档不存在")
+
+        if document.dataset_id != dataset_id or str(document.account_id) != account_id:
+            raise ForbiddenException("文档不属于该知识库")
+
+        # 已经构建完成或者发生错误的文档才可以删除
+        if document.status not in [DocumentStatus.COMPLETED, DocumentStatus.ERROR]:
+            raise ForbiddenException("文档正在处理中，请稍后再试")
+
+        # 删除pg中的文档
+        self.delete(document)
+
+        # 调用异步任务执行后续操作，涵盖删除片段、更新词表、删除向量
+        delete_document.delay(dataset_id, document_id)
+        return document
+
 
     def get_document_position(self, dataset_id: UUID) -> int:
         """获取当前知识库的最新文档位置"""

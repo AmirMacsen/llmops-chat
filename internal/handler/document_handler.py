@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from flask import request
 
 from internal.schema.document_schema import CreateDocumentsRequest, CreateDocumentsResponse, GetDocumentResponse, \
-    UpdateDocumentNameRequest, GetDocumentsWithPageRequest, GetDocumentsWithPageResponse
+    UpdateDocumentNameRequest, GetDocumentsWithPageRequest, GetDocumentsWithPageResponse, UpdateDocumentEnabledRequest
 from internal.service import DocumentService
 from pkg.paginator import PageModel
 from pkg.response import validate_error_json, success_json
@@ -68,6 +68,25 @@ class DocumentHandler:
         documents, paginator = self.document_service.get_documents_with_page(dataset_id, req)
         response = GetDocumentsWithPageResponse(many=True)
         return success_json(PageModel(list=response.dump(documents), paginator=paginator))
+
+
+    def update_document_enabled(self, dataset_id:UUID, document_id:UUID):
+        """根据传递的documentid和datasetid启用文档"""
+        req = UpdateDocumentEnabledRequest(request.args)
+        if not req.validate():
+            return validate_error_json(req.errors)
+
+        # 调用服务更改指定文档的状态
+        self.document_service.update_document_enabled(dataset_id, document_id, req.enabled.data)
+        return success_json(data="更改文档启用状态成功")
+
+
+    def delete_document(self, dataset_id:UUID, document_id:UUID):
+        """根据传递的documentid和datasetid删除文档"""
+        self.document_service.delete_document(dataset_id, document_id)
+        return success_json(data="删除文档成功")
+
+
 
 
 
