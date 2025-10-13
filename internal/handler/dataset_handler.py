@@ -9,7 +9,7 @@ from weaviate.collections.classes.filters import Filter
 
 from internal.core.file_extractor import FileExtractor
 from internal.schema.dataset_schema import CreateDatasetRequest, UpdateDatasetRequest, GetDatasetsWithPageRequest, \
-    GetDatasetResponse, GetDatasetsWithPageResponse
+    GetDatasetResponse, GetDatasetsWithPageResponse, HitRequest, GetDatasetQueriesResponse
 from internal.service import EmbeddingsService, JiebaService
 from internal.service.dataset_service import DatasetService
 from internal.service.vector_database_service import VectorDatabaseService
@@ -36,28 +36,12 @@ class DatasetHandler:
 
     def hit(self, dataset_id:UUID):
         """文档召回测试"""
-        query="Allows you to animate without code. Don't need to use this if you plan to start the animation in code."
-        retriever = self.vector_database_service.vector_store.as_retriever(
-            search_type="mmr",
-            search_kwargs={
-                "k": 10,
-                "filters":Filter.all_of([
-                    Filter.by_property("document_enabled").equal(True),
-                    Filter.by_property("segment_enabled").equal(True),
-                    Filter.any_of([
-                        Filter.by_property("dataset_id").equal("b86cfc41-ca11-4a7c-8167-b032cbcd100d"),
-                        Filter.by_property("dataset_id").equal("b86cfc41-ca11-4a7c-8167-b032cbcd100f"),
-                    ])
-                ])
-            },
-        )
-        documents = retriever.invoke(query)
-        return success_json({"documents":[
-            {
-                "metadata": document.metadata,
-                "page_content":document.page_content,
-            } for document in documents
-        ]})
+        req = HitRequest()
+        if not req.validate():
+            return validate_error_json(req.errors)
+        # 调用服务执行检索策略
+        hit_result = self.dataset_service.hit(dataset_id, req)
+        return success_json(hit_result)
 
     def create_dataset(self):
         """创建知识库"""
@@ -107,3 +91,15 @@ class DatasetHandler:
 
         return success_json(PageModel(list=resp.dump(datasets), paginator=paginator))
 
+
+    def get_dataset_quires(self, dataset_id: UUID):
+        """根据传递的知识库ID获取最近的10条查寻记录"""
+        dataset_quires = self.dataset_service.get_dataset_quires(dataset_id)
+        response = GetDatasetQueriesResponse(many=True)
+        return success_json(response.dump(dataset_quires))
+
+
+    def delete_dataset(self, dataset_id: UUID):
+        """根据传递的知识库id删除知识库"""
+        self.dataset_service.delete_dataset(dataset_id)
+        return success_message("删除知识库成功")

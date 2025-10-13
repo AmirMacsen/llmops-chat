@@ -7,6 +7,7 @@ from langchain.embeddings import CacheBackedEmbeddings
 from langchain_community.storage import RedisStore
 from langchain_core.embeddings import Embeddings
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from redis import Redis
 
 
@@ -21,14 +22,8 @@ class EmbeddingsService:
     def __init__(self, redis: Redis):
         """构造函数，初始化文本嵌入模型客户端、存储器、缓存客户端"""
         self._store = RedisStore(client=redis)
-        self._embeddings = HuggingFaceEmbeddings(
-            model_name="Alibaba-NLP/gte-multilingual-base",
-            cache_folder=os.path.join(os.getcwd(), "internal", "core", "embeddings"),
-            model_kwargs={
-                "trust_remote_code": True,
-            }
-        )
-        # self._embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+        # 使用 OpenAI 的 text-embedding-3-small 模型，它输出 1536 维向量
+        self._embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         self._cache_backed_embeddings = CacheBackedEmbeddings.from_bytes_store(
             self._embeddings,
             self._store,

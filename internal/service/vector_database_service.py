@@ -55,4 +55,3 @@ class VectorDatabaseService:
     def collection(self) -> Collection:
         """获取weaviate的集合"""
         return self.client.collections.get(COLLECTION_NAME)
-

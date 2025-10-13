@@ -179,6 +179,12 @@ class Segment(db.Model):
     created_at = Column(DateTime, nullable=False, server_default=text('CURRENT_TIMESTAMP(0)'))
 
 
+    @property
+    def document(self) -> "Document":
+        """只读属性，获取片段所属的文档"""
+        return db.session.query(Document).get(self.document_id)
+
+
 class KeywordTable(db.Model):
     """关键词表模型"""
     __tablename__ = "keyword_table"

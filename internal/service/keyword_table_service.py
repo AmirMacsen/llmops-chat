@@ -36,9 +36,8 @@ class KeywordTableService(BaseService):
 
     def delete_keyword_table_from_ids(self, dataset_id: UUID, segment_ids: list[str])->None:
         """根据传入的dataset_id和segment_id删除对应的关键词表"""
-
         # 删除知识库中关联的关键词表数据，需要上锁，避免并发更新
-        cache_key = "LOCK_KEYWORD_TABLE_UPDATE_KEYWORD_TABLE".format(dataset_id)
+        cache_key = LOCK_KEYWORD_TABLE_UPDATE_KEYWORD_TABLE.format(dataset_id=dataset_id)
         with self.redis_client.lock(cache_key, timeout=LOCK_EXPIRE):
             # 获取当前知识库的关键词表
             keyword_table_record = self.get_keyword_table_from_dataset(dataset_id)
@@ -70,7 +69,7 @@ class KeywordTableService(BaseService):
 
     def add_keyword_table_from_ids(self, dataset_id: UUID, segment_ids: list[str]) -> None:
         """根据传入的dataset_id和片段id"""
-        cache_key = LOCK_KEYWORD_TABLE_UPDATE_KEYWORD_TABLE.format(dataset_id)
+        cache_key = LOCK_KEYWORD_TABLE_UPDATE_KEYWORD_TABLE.format(dataset_id=dataset_id)
 
         with self.redis_client.lock(cache_key, timeout=LOCK_EXPIRE):
             # 获取当前知识库的关键词词表

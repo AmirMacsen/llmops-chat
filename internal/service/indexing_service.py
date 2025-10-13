@@ -19,7 +19,7 @@ from internal.entity.cache_entity import LOCK_DOCUMENT_UPDATE_ENABLED, LOCK_KEYW
 from internal.entity.dataset_entity import DocumentStatus, SegmentStatus
 from internal.exception import NotFoundException
 from internal.lib.helper import generate_text_hash
-from internal.model import Document, Segment
+from internal.model import Document, Segment, KeywordTable, DatasetQuery
 from internal.service import EmbeddingsService
 from internal.service.base_service import BaseService
 from internal.service.jieba_service import JiebaService
@@ -104,7 +104,6 @@ class IndexingService(BaseService):
         node_ids = [
             node_id for _, node_id, _ in segments
         ]
-
         # 执行循环遍历所有node_ids并更新向量数据库
         try:
             connect = self.vector_database_service.collection
@@ -343,9 +342,39 @@ class IndexingService(BaseService):
                 Segment.document_id == document_id
             ).delete()
 
-
         # 删除关键词表数据和向量数据库中的数据
         self.keyword_table_service.delete_keyword_table_from_ids(dataset_id, segment_ids)
+
+    def delete_dataset(self, dataset_id: UUID) -> None:
+        """根据传递的知识库id执行相应的删除操作"""
+        try:
+            with self.db.auto_commit():
+                # 1.删除关联的文档记录
+                self.db.session.query(Document).filter(
+                    Document.dataset_id == dataset_id,
+                ).delete()
+
+                # 2.删除关联的片段记录
+                self.db.session.query(Segment).filter(
+                    Segment.dataset_id == dataset_id,
+                ).delete()
+
+                # 3.删除关联的关键词表记录
+                self.db.session.query(KeywordTable).filter(
+                    KeywordTable.dataset_id == dataset_id,
+                ).delete()
+
+                # 4.删除知识库查询记录
+                self.db.session.query(DatasetQuery).filter(
+                    DatasetQuery.dataset_id == dataset_id,
+                ).delete()
+
+            # 5.调用向量数据库删除知识库的关联记录
+            self.vector_database_service.collection.data.delete_many(
+                where=Filter.by_property("dataset_id").equal(str(dataset_id))
+            )
+        except Exception as e:
+            logging.exception(f"异步删除知识库关联内容出错, dataset_id: {dataset_id}, 错误信息: {str(e)}")
 
     @classmethod
     def _clean_extra_text(cls, text: str) -> str:

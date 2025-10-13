@@ -9,6 +9,8 @@ from .document_service import DocumentService
 from .indexing_service import IndexingService
 from .process_rule_service import ProcessRuleService
 from .keyword_table_service import KeywordTableService
+from .segment_service import SegmentService
+from .retrieval_service import RetrievalService
 
 __all__ = ["AppService",
            "BuiltinToolsService",
@@ -21,4 +23,6 @@ __all__ = ["AppService",
            "IndexingService",
            "ProcessRuleService",
            "KeywordTableService",
+           "SegmentService",
+           "RetrievalService",
            ]

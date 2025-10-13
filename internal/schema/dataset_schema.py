@@ -1,8 +1,11 @@
 from flask_wtf import FlaskForm
 from marshmallow import Schema, fields, pre_dump
 from wtforms import StringField
-from wtforms.validators import DataRequired, Length, URL, Optional
+from wtforms.fields.numeric import IntegerField, FloatField
+from wtforms.validators import DataRequired, Length, URL, Optional, AnyOf, NumberRange
 
+from internal.entity.dataset_entity import RetrievalStrategy
+from internal.lib.helper import datetime_to_timestamp
 from internal.model import Dataset
 from pkg.paginator import PaginatorRequest
 
@@ -99,4 +102,43 @@ class GetDatasetsWithPageResponse(Schema):
             "character_count": data.character_count,
             "updated_at": int(data.updated_at.timestamp()),
             "created_at": int(data.created_at.timestamp()),
+        }
+
+
+class HitRequest(FlaskForm):
+    """文档召回请求"""
+    query = StringField("query", validators=[
+        DataRequired("query不能为空"),
+        Length(max=200, message="query长度不能超过200字符")
+    ])
+
+    retrieval_strategy = StringField("retrieval_strategy", validators=[
+        DataRequired("retrieval_strategy不能为空"),
+        AnyOf([item.value for item in RetrievalStrategy], message="retrieval_strategy参数错误")
+    ])
+    k = IntegerField("k", validators=[
+        DataRequired("k不能为空"),
+        NumberRange(min=1, max=10, message="最大召回数量1-10")
+    ])
+    score = FloatField("score", validators=[
+        NumberRange(min=0, max=1, message="score参数错误")
+    ])
+
+
+class GetDatasetQueriesResponse(Schema):
+    """获取知识库查询记录响应数据"""
+    id = fields.UUID(dump_default="")
+    dataset_id = fields.UUID(dump_default="")
+    query = fields.String(dump_default="")
+    source = fields.String(dump_default="")
+    created_at = fields.Integer(dump_default=0)
+
+    @pre_dump
+    def process_data(self, data: Dataset, **kwargs):
+        return {
+            "id": data.id,
+            "dataset_id": data.dataset_id,
+            "query": data.query,
+            "source": data.source,
+            "created_at": datetime_to_timestamp(data.created_at),
         }

@@ -194,6 +194,16 @@ class AppHandler(object):
         if configurable_memory is not None and isinstance(configurable_memory, BaseMemory):
             configurable_memory.save_context(run_obj.inputs, run_obj.outputs)
 
+    def _get_memory(self):
+        """获取对话内存实例"""
+        return ConversationBufferWindowMemory(
+            k=3,
+            input_key="query",
+            output_key="output",
+            return_messages=True,
+            chat_memory=FileChatMessageHistory("./storage/memory/chat_history.txt"),
+        )
+
     def debug(self, app_id: uuid.UUID):
         """
         调试聊天接口
@@ -249,13 +259,9 @@ class AppHandler(object):
             MessagesPlaceholder('history'),
             ("human", "{query}")
         ])
-        memory = ConversationBufferWindowMemory(
-            k=3,
-            input_key="query",
-            output_key="output",
-            return_messages=True,
-            chat_memory=FileChatMessageHistory("./storage/memory/chat_history.txt"),
-        )
+        
+        # 延迟初始化 memory
+        memory = self._get_memory()
 
         llm = ChatOpenAI(model="gpt-3.5-turbo-16k")
 
