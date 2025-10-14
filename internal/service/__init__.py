@@ -11,6 +11,7 @@ from .process_rule_service import ProcessRuleService
 from .keyword_table_service import KeywordTableService
 from .segment_service import SegmentService
 from .retrieval_service import RetrievalService
+from .conversation_service import ConversationService
 
 __all__ = ["AppService",
            "BuiltinToolsService",
@@ -25,4 +26,5 @@ __all__ = ["AppService",
            "KeywordTableService",
            "SegmentService",
            "RetrievalService",
+           "ConversationService"
            ]

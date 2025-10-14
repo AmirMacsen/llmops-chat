@@ -1,7 +1,10 @@
 import dataclasses
+import json
 import uuid
 from operator import itemgetter
-from typing import Any, Dict
+from queue import Queue
+from threading import Thread
+from typing import Any, Dict, Generator
 
 from flask import request
 from injector import inject
@@ -13,10 +16,11 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, Prom
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda, RunnableConfig
 from langchain_core.tracers import Run
 from langchain_openai import ChatOpenAI
+from langgraph.graph import MessagesState
 
 from internal.model import App
 from internal.schema.app_schema import CompletionRequest
-from internal.service import AppService, ApiToolService
+from internal.service import AppService, ApiToolService, ConversationService
 from internal.task.demo_task import demo_task
 from pkg.response import success_json, validate_error_json, success_message
 from internal.core.tools.builtin_tools.providers import BuiltinProviderManager
@@ -28,8 +32,9 @@ class AppHandler(object):
     """应用处理类"""
 
     app_service: AppService
-    provider: BuiltinProviderManager
+    builtin_provider_manager: BuiltinProviderManager
     api_tool_service: ApiToolService
+    conversation_service: ConversationService
 
     def create_app(self):
         """
@@ -194,7 +199,8 @@ class AppHandler(object):
         if configurable_memory is not None and isinstance(configurable_memory, BaseMemory):
             configurable_memory.save_context(run_obj.inputs, run_obj.outputs)
 
-    def _get_memory(self):
+    @classmethod
+    def _get_memory(cls):
         """获取对话内存实例"""
         return ConversationBufferWindowMemory(
             k=3,
@@ -204,7 +210,7 @@ class AppHandler(object):
             chat_memory=FileChatMessageHistory("./storage/memory/chat_history.txt"),
         )
 
-    def debug(self, app_id: uuid.UUID):
+    def _debug(self, app_id: uuid.UUID):
         """
         调试聊天接口
         ---
@@ -276,6 +282,73 @@ class AppHandler(object):
 
         return success_json({"content": content})
 
+    def debug(self, app_id: uuid.UUID):
+        """流式输出接口"""
+        req = CompletionRequest()
+        if not req.validate():
+            return validate_error_json(req.errors)
+        # 创建队列，并提取query
+        q = Queue()
+        query = req.query.data
+
+        # 创建graph
+        def graph_app() -> None:
+            # 创建tools工具列表
+            tools = [
+                self.builtin_provider_manager.get_tool("google", "google_serper")(),
+                self.builtin_provider_manager.get_tool("google", "google_weather")(),
+                self.builtin_provider_manager.get_tool("dalle", "dalle3")(),
+            ]
+
+            # 定义llm
+            def  chatbot(state:MessagesState) -> MessagesState:
+                llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7).bind_tools(tools)
+
+                # 调用stream
+                is_first_chunk=True
+                is_tool_call=False
+                gathered = None
+                id = str(uuid.uuid4())
+                for chunk in llm.stream(state["messages"]):
+                    # 检测是否是第一个块
+                    if is_first_chunk and chunk.content == "" and not chunk.tool_calls:
+                        continue
+                    # 叠加块内容
+                    if is_first_chunk:
+                        gathered = chunk
+                        is_first_chunk = False
+                    else:
+                        gathered +=  chunk
+
+                    # # 判断是工具调用还是文本生成
+                    # if tool_call or is_tool_call:
+                    #     is_tool_call = True
+                    #     id = str(uuid.uuid4())
+                    #     tool = tools_by_name[tool_call["name"]]
+                    #     q.put({
+                    #         "id": id,
+                    #         "event": "agent_thought",
+                    #         "data": json.dumps(chunk.tool_call_chunk)
+                    #     })
+
+
+        def stream_event_response() -> Generator:
+            """流式事件输出响应"""
+            while True:
+                item = q.get()
+                if item is None:
+                    break
+                yield f"evnet: {item.get('event')}\ndata: {json.dumps(item)}\n\n"
+                q.task_done()
+
+        t = Thread(target=graph_app)
+        t.start()
+
+
+
+
+
+
     def completion(self):
         """
         聊天接口
@@ -346,10 +419,8 @@ class AppHandler(object):
                         type: object
         """
         """测试方法"""
-        # entities = self.provider.get_provider_entities()
+        human_message = ""
+        ai_message = ""
+        summary = self.conversation_service.summary(human_message="你好", ai_message="你好", old_summary="")
 
-        # return success_json({"ping": [p.dict() for p in entities]})
-
-        # 调用异步任务
-        demo_task.delay(uuid.uuid4())
-        return self.api_tool_service.api_tool_invoke()
+        return success_json({"summary": summary})

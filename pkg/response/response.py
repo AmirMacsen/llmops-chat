@@ -1,6 +1,7 @@
-from typing import Any
+from typing import Any, Union, Generator
 
 from flask import jsonify
+from flask import Response as FlaskResponse, stream_with_context
 from pydantic import BaseModel, field_serializer
 
 from .http_code import HttpCode
@@ -70,3 +71,20 @@ def unauthorized_message(msg: str = ""):
 def forbidden_message(msg: str = ""):
     """无权限消息响应"""
     return message(code=HttpCode.FORBIDDEN, msg=msg)
+
+def compact_generate_response(response:Union[Response, Generator]) -> FlaskResponse:
+    """统一合并处理块输出和流式事件输出"""
+    # 检测是否是块输出
+    if isinstance(response, Response):
+        return json(response)
+    else:
+        # 流式事件输出
+        def generate() -> Generator:
+            yield from response
+
+        # 返回携带上下文的流式事件输出
+        return FlaskResponse(
+            stream_with_context(generate()),
+            mimetype="text/event-stream",
+            status=200,
+        )
