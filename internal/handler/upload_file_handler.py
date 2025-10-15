@@ -1,5 +1,6 @@
 from injector import inject
 from dataclasses import dataclass
+from flask_login import login_required
 
 from internal.schema.upload_file_schema import UploadFileRequest, UploadFileResponse, UploadImageRequest
 from internal.service import CosService
@@ -12,6 +13,7 @@ class UploadFileHandler:
     cos_service: CosService
 
 
+    @login_required
     def upload_file(self):
         """
         上传文件接口
@@ -100,6 +102,7 @@ class UploadFileHandler:
         return success_json(data=response.dump(file))
 
 
+    @login_required
     def upload_image(self):
         """
         上传图片接口

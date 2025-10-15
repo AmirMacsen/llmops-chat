@@ -145,6 +145,8 @@ class IndexingService(BaseService):
                 enabled=_enabled,
                 disabled_at=None if _enabled else datetime.now(),
             )
+            # 重新抛出异常，以便上层能够捕获并处理
+            raise e
         finally:
             self.redis_client.delete(cache_key)
 

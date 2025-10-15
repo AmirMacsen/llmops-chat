@@ -11,6 +11,7 @@ from injector import inject
 from langchain.memory import ConversationBufferWindowMemory
 from langchain_community.chat_message_histories import FileChatMessageHistory
 from langchain_core.memory import BaseMemory
+from langchain_core.messages import AnyMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, PromptTemplate
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda, RunnableConfig
@@ -18,6 +19,7 @@ from langchain_core.tracers import Run
 from langchain_openai import ChatOpenAI
 from langgraph.graph import MessagesState
 
+from flask_login import login_required, current_user
 from internal.model import App
 from internal.schema.app_schema import CompletionRequest
 from internal.service import AppService, ApiToolService, ConversationService
@@ -36,6 +38,7 @@ class AppHandler(object):
     api_tool_service: ApiToolService
     conversation_service: ConversationService
 
+    @login_required
     def create_app(self):
         """
         创建应用
@@ -62,6 +65,7 @@ class AppHandler(object):
         app = self.app_service.create_app()
         return success_message(f"应用已经成功创建，id为{app.id}")
 
+    @login_required
     def get_app(self, app_id:uuid.UUID):
         """
         获取应用
@@ -113,6 +117,7 @@ class AppHandler(object):
         return success_message(f"应用已经成功找到，名字为{app.name}")
 
 
+    @login_required
     def update_app(self, app_id:uuid.UUID) -> App:
         """
         更新应用
@@ -148,6 +153,7 @@ class AppHandler(object):
         return success_message(f"应用已经成功更新，名字为{app.name}")
 
 
+    @login_required
     def delete_app(self, app_id:uuid.UUID):
         """
         删除应用
@@ -209,78 +215,6 @@ class AppHandler(object):
             return_messages=True,
             chat_memory=FileChatMessageHistory("./storage/memory/chat_history.txt"),
         )
-
-    def _debug(self, app_id: uuid.UUID):
-        """
-        调试聊天接口
-        ---
-        tags:
-          - Apps
-        summary: 调试聊天功能
-        description: 使用特定应用进行聊天调试
-        parameters:
-          - name: app_id
-            in: path
-            description: 应用ID
-            required: true
-            schema:
-              type: string
-              format: uuid
-        requestBody:
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  query:
-                    type: string
-                    example: "你好"
-        responses:
-          200:
-            description: 成功获取响应
-            content:
-              application/json:
-                schema:
-                  type: object
-                  properties:
-                    code:
-                      type: integer
-                      example: 200
-                    data:
-                      type: object
-                      properties:
-                        content:
-                          type: string
-                          example: "你好！有什么我可以帮你的吗？"
-        """
-        """聊天接口"""
-        # 1.提取从接口中获取的输入，POST
-        req = CompletionRequest()
-        if not req.validate():
-            return validate_error_json(req.errors)
-
-        # 2.构建组件
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "你是一个强大的聊天机器人，能根据用户的提问回复用户的问题"),
-            MessagesPlaceholder('history'),
-            ("human", "{query}")
-        ])
-        
-        # 延迟初始化 memory
-        memory = self._get_memory()
-
-        llm = ChatOpenAI(model="gpt-3.5-turbo-16k")
-
-        chain = (RunnablePassthrough.assign(
-            history=RunnableLambda(self._load_memory_variables) | itemgetter("history"),
-        ) | prompt | llm | StrOutputParser()).with_listeners(on_end=self._save_context)
-
-
-        # 4.调用链得到结果
-        chain_input = {"query": req.query.data}
-        content = chain.invoke(chain_input, config={"configurable": {"memory": memory}})
-
-        return success_json({"content": content})
 
     def debug(self, app_id: uuid.UUID):
         """流式输出接口"""
@@ -344,11 +278,7 @@ class AppHandler(object):
         t = Thread(target=graph_app)
         t.start()
 
-
-
-
-
-
+    @login_required
     def completion(self):
         """
         聊天接口
@@ -419,8 +349,13 @@ class AppHandler(object):
                         type: object
         """
         """测试方法"""
-        human_message = ""
-        ai_message = ""
-        summary = self.conversation_service.summary(human_message="你好", ai_message="你好", old_summary="")
+        from internal.core.agent.agents import FunctionCallAgent
+        from internal.core.agent.entities.agent_entity import AgentConfig
+        from langchain_openai import ChatOpenAI
+        agent = FunctionCallAgent(AgentConfig(
+            llm = ChatOpenAI(model="gpt-4o-mini"),
+        ))
+        state = agent.run("你好", [], "")
+        content = state["messages"][-1].content
 
-        return success_json({"summary": summary})
+        return success_json({"content": content})

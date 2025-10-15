@@ -11,7 +11,7 @@ from internal.schema.dataset_schema import CreateDatasetRequest, UpdateDatasetRe
 from pkg.paginator import Paginator
 from pkg.sqlalchemy import SQLAlchemy
 from .base_service import BaseService
-from internal.model import Dataset, Segment, DatasetQuery
+from internal.model import Dataset, Segment, DatasetQuery, Account
 from internal.exception import ValidationException, NotFoundException, FailedException
 from internal.entity.dataset_entity import DEFAULT_DATASET_DESCRIPTION_FORMATTER
 from internal.lib.helper import datetime_to_timestamp
@@ -28,10 +28,10 @@ class DatasetService(BaseService):
     db: SQLAlchemy
     retrieval_service: RetrievalService
 
-    def create_dataset(self, req: CreateDatasetRequest):
+    def create_dataset(self, req: CreateDatasetRequest, account: Account = None):
         """创建数据集"""
-        # todo: 权限验证
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+            
         # 唯一性校验
         # 1.检测该账号下是否存在同名知识库
         dataset = self.db.session.query(Dataset).filter_by(
@@ -54,10 +54,9 @@ class DatasetService(BaseService):
             description=req.description.data,
         )
 
-    def get_dataset(self, dataset_id: UUID) -> Dataset:
+    def get_dataset(self, dataset_id: UUID, account: Account = None) -> Dataset:
         """根据传递的知识库id获取知识库记录"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
 
         dataset = self.get(Dataset, dataset_id)
         if dataset is None or str(dataset.account_id) != account_id:
@@ -65,10 +64,9 @@ class DatasetService(BaseService):
 
         return dataset
 
-    def update_dataset(self, dataset_id: UUID, req: UpdateDatasetRequest) -> Dataset:
+    def update_dataset(self, dataset_id: UUID, req: UpdateDatasetRequest, account: Account = None) -> Dataset:
         """根据传递的知识库id+数据更新知识库"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
 
         # 1.检测知识库是否存在并校验
         dataset = self.get(Dataset, dataset_id)
@@ -98,10 +96,9 @@ class DatasetService(BaseService):
 
         return dataset
 
-    def get_datasets_with_page(self, req: GetDatasetsWithPageRequest) -> tuple[list[Dataset], Paginator]:
+    def get_datasets_with_page(self, req: GetDatasetsWithPageRequest, account: Account = None) -> tuple[list[Dataset], Paginator]:
         """根据传递的信息获取知识库列表分页数据"""
-        # todo:等待授权认证模块完成进行切换调整
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
 
         # 1.构建分页查询器
         paginator = Paginator(db=self.db, req=req)
@@ -119,9 +116,9 @@ class DatasetService(BaseService):
         return datasets, paginator
 
 
-    def hit(self, dataset_id: UUID, req:HitRequest)->list[dict]:
+    def hit(self, dataset_id: UUID, req:HitRequest, account: Account = None)->list[dict]:
         """文档召回"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
 
         dataset = self.get(Dataset, dataset_id)
         if dataset is None or str(dataset.account_id) != account_id:
@@ -183,10 +180,9 @@ class DatasetService(BaseService):
         return hit_result
 
 
-    def get_dataset_quires(self, dataset_id: UUID):
+    def get_dataset_quires(self, dataset_id: UUID, account: Account = None):
         """获取知识库查询列表"""
-
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
 
         dataset = self.get(Dataset, dataset_id)
         if dataset is None or str(dataset.account_id) != account_id:
@@ -197,9 +193,9 @@ class DatasetService(BaseService):
         ).order_by(desc("created_at")).limit(10).all()
 
 
-    def delete_dataset(self, dataset_id: UUID):
+    def delete_dataset(self, dataset_id: UUID, account: Account = None):
         """删除知识库"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
 
         dataset = self.get(Dataset, dataset_id)
         if dataset is None or str(dataset.account_id) != account_id:

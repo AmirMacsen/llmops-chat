@@ -1,5 +1,6 @@
 from uuid import UUID
 from flask import request
+from flask_login import login_required
 
 from injector import inject
 from dataclasses import dataclass
@@ -17,6 +18,7 @@ class SegmentHandler:
     """片段处理器"""
     segment_service: SegmentService
 
+    @login_required
     def get_segment_with_page(self, dataset_id: UUID, document_id: UUID):
         """获取指定知识库文档的片段列表"""
         # 提取请求并校验
@@ -31,12 +33,14 @@ class SegmentHandler:
         return success_json(PageModel(list=response.dump(segments), paginator=paginator))
 
 
+    @login_required
     def get_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID):
         """获取指定的文档片段信息"""
         segment = self.segment_service.get_segment(dataset_id, document_id, segment_id)
         resp = GetSegmentResponse()
         return success_json(resp.dump(segment))
 
+    @login_required
     def update_segment_enabled(self, dataset_id: UUID, document_id: UUID, segment_id: UUID):
         """根据传递的信息更新指定的文档片段启用状态"""
         # 1.提取请求并校验
@@ -50,6 +54,7 @@ class SegmentHandler:
         return success_message("修改片段状态成功")
 
 
+    @login_required
     def create_segment(self, dataset_id: UUID, document_id: UUID):
         """根据传递的信息创建知识库文档片段"""
         req = CreateSegmentRequest()
@@ -61,6 +66,7 @@ class SegmentHandler:
         return success_json("新增文档片段成功")
 
 
+    @login_required
     def update_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID):
         """根据传递的信息更新知识库文档片段"""
         req = UpdateSegmentRequest()
@@ -71,8 +77,8 @@ class SegmentHandler:
         return success_message("更新文档片段成功")
 
 
+    @login_required
     def delete_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID):
         """根据传递的信息删除指定的片段"""
         self.segment_service.delete_segment(dataset_id, document_id, segment_id)
         return success_message("删除片段成功")
-

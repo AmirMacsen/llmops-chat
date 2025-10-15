@@ -3,10 +3,12 @@ import os
 from flask import Flask
 from flask_migrate import Migrate
 from flask_cors import CORS
+from flask_login import LoginManager
 from flasgger import Swagger
 
 from config import Config
 from internal.exception import CustomException
+from internal.middleware.middleware import Middleware
 from internal.router import Router
 from pkg.response import Response, json, HttpCode
 from pkg.sqlalchemy import SQLAlchemy
@@ -21,6 +23,8 @@ class Http(Flask):
             config: Config,
             db:SQLAlchemy,
             migrate:Migrate,
+            login_manager:LoginManager,
+            middleware: Middleware,
             router:Router,
             **kwargs):
         super(Http, self).__init__(*args, **kwargs)
@@ -54,6 +58,9 @@ class Http(Flask):
         # 日志
         logging_extension.init_app(self)
 
+        # 初始化登录
+        login_manager.init_app(self)
+
         # 解决前后端跨域问题
         CORS(self, resources={r"/*": {
             "origins": "*",
@@ -62,6 +69,9 @@ class Http(Flask):
             # "allowed_headers": ["Content-Type"]
             }
         })
+
+        # 注册应用中间件
+        login_manager.request_loader(middleware.request_loader)
 
         # 注册路由
         router.register_router(self)

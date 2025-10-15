@@ -6,7 +6,7 @@ DEFAULT_DATASET_DESCRIPTION_FORMATTER = "当你需要回答管理《{name}》的
 
 # 文档处理类型
 class DocumentProcessType:
-    AUTOMIC = "automic"
+    AUTOMIC = "automatic"
     CUSTOM = "custom"
 
 

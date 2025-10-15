@@ -3,6 +3,7 @@ from uuid import UUID
 from injector import inject
 from dataclasses import dataclass
 from flask import request
+from flask_login import login_required
 
 from internal.schema.document_schema import CreateDocumentsRequest, CreateDocumentsResponse, GetDocumentResponse, \
     UpdateDocumentNameRequest, GetDocumentsWithPageRequest, GetDocumentsWithPageResponse, UpdateDocumentEnabledRequest
@@ -17,6 +18,7 @@ class DocumentHandler:
     """文档处理服务"""
     document_service: DocumentService
 
+    @login_required
     def create_documents(self, dataset_id:UUID):
         """创建文档 列表"""
         # 校验请求
@@ -35,6 +37,7 @@ class DocumentHandler:
         return success_json(response.dump((documents, batch)))
 
 
+    @login_required
     def get_documents_status(self, dataset_id:UUID, batch:str):
         """根据传递的知识库id和批处理标识获取文档的状态"""
         documents_status = self.document_service.get_documents_status(dataset_id, batch)
@@ -42,6 +45,7 @@ class DocumentHandler:
         return success_json(documents_status)
 
 
+    @login_required
     def get_document(self, dataset_id:UUID, document_id:UUID):
         """根据传递的知识库ID和文档iD获取文档"""
         document = self.document_service.get_document(dataset_id, document_id)
@@ -49,6 +53,7 @@ class DocumentHandler:
         return success_json(response.dump(document))
 
 
+    @login_required
     def update_document_name(self, dataset_id:UUID, document_id:UUID):
         """更新文档"""
         request = UpdateDocumentNameRequest()
@@ -59,6 +64,7 @@ class DocumentHandler:
         return success_json(data="更新数据成功")
 
 
+    @login_required
     def get_document_with_page(self, dataset_id:UUID):
         """根据传递的知识库ID获取文档分页"""
 
@@ -70,9 +76,13 @@ class DocumentHandler:
         return success_json(PageModel(list=response.dump(documents), paginator=paginator))
 
 
+    @login_required
     def update_document_enabled(self, dataset_id:UUID, document_id:UUID):
         """根据传递的documentid和datasetid启用文档"""
-        req = UpdateDocumentEnabledRequest(request.args)
+        req = UpdateDocumentEnabledRequest()
+        print(f"Form validation result: {req.validate()}")
+        print(f"Enabled field data: {req.enabled.data}, type: {type(req.enabled.data)}")
+        
         if not req.validate():
             return validate_error_json(req.errors)
 
@@ -81,15 +91,8 @@ class DocumentHandler:
         return success_json(data="更改文档启用状态成功")
 
 
+    @login_required
     def delete_document(self, dataset_id:UUID, document_id:UUID):
         """根据传递的documentid和datasetid删除文档"""
         self.document_service.delete_document(dataset_id, document_id)
         return success_json(data="删除文档成功")
-
-
-
-
-
-
-
-

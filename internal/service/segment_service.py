@@ -11,7 +11,7 @@ from langchain_core.documents import Document as LCDocument
 from internal.entity.cache_entity import LOCK_EXPIRE, LOCK_SEGMENT_UPDATE_ENABLED
 from internal.entity.dataset_entity import SegmentStatus, DocumentStatus
 from internal.exception import ValidationException, NotFoundException, FailedException
-from internal.model import Segment, Document
+from internal.model import Segment, Document, Account
 from internal.schema.segment_schema import GetSegmentWithPageRequest, CreateSegmentRequest, UpdateSegmentRequest
 from internal.service.base_service import BaseService
 from internal.service.keyword_table_service import KeywordTableService
@@ -34,11 +34,11 @@ class SegmentService(BaseService):
     embeddings_service: EmbeddingsService
     jieba_service: JiebaService
 
-    def get_segment_with_page(self, dataset_id: UUID, document_id: UUID, req: GetSegmentWithPageRequest) -> tuple[
+    def get_segment_with_page(self, dataset_id: UUID, document_id: UUID, req: GetSegmentWithPageRequest, account: Account = None) -> tuple[
         list[Segment], Paginator]:
         """获取指定知识库文档的片段列表"""
-        # todo: 权限验证
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+            
         document = self.get(Document, document_id)
         if document is None or document.dataset_id != dataset_id or str(document.account_id) != account_id:
             raise NotFoundException("该文档不存在")
@@ -56,10 +56,10 @@ class SegmentService(BaseService):
 
         return segments, paginator
 
-    def get_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID) -> Segment | None:
+    def get_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID, account: Account = None) -> Segment | None:
         """获取指定的文档片段信息"""
-        # todo: 权限验证
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+            
         document = self.get(Document, document_id)
         if document is None or document.dataset_id != dataset_id or str(document.account_id) != account_id:
             raise NotFoundException("该文档不存在")
@@ -74,9 +74,9 @@ class SegmentService(BaseService):
             raise NotFoundException("该片段不存在")
         return segment
 
-    def update_segment_enabled(self, dataset_id: UUID, document_id: UUID, segment_id: UUID, enabled: bool) -> None:
+    def update_segment_enabled(self, dataset_id: UUID, document_id: UUID, segment_id: UUID, enabled: bool, account: Account = None) -> None:
         """根据传递的信息更新指定的文档片段启用状态"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
 
         # 获取片段信息并校验权限
         segment = self.get(Segment, segment_id)
@@ -138,9 +138,9 @@ class SegmentService(BaseService):
                 )
                 raise FailedException(f"更改文档片段启用状态发生异常，segment_id:{segment_id}")
 
-    def create_segment(self, dataset_id: UUID, document_id: UUID, request: CreateSegmentRequest) -> None:
+    def create_segment(self, dataset_id: UUID, document_id: UUID, request: CreateSegmentRequest, account: Account = None) -> None:
         """根据传递的信息创建知识库文档片段"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
 
         # 校验上传内容的token总数不能超过1000
         token_count = self.embeddings_service.calculate_token_count(request.content.data)
@@ -229,9 +229,10 @@ class SegmentService(BaseService):
                             stopped_at=datetime.now())
             raise FailedException("新增文档片段失败")
 
-    def update_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID, request: UpdateSegmentRequest):
+    def update_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID, request: UpdateSegmentRequest, account: Account = None):
         """根据传递的信息更新指定的文档片段信息"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+            
         document = self.get(Document, document_id)
         if document is None or document.dataset_id != dataset_id or str(document.account_id) != account_id:
             raise NotFoundException("该文档不存在")
@@ -299,9 +300,10 @@ class SegmentService(BaseService):
 
         return segment
 
-    def delete_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID):
+    def delete_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID, account: Account = None):
         """根据传递的信息删除指定的片段"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+            
         document = self.get(Document, document_id)
         if document is None or document.dataset_id != dataset_id or str(document.account_id) != account_id:
             raise NotFoundException("该文档不存在")

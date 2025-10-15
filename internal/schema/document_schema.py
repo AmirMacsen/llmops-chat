@@ -178,7 +178,7 @@ class GetDocumentsWithPageResponse(Schema):
     """获取文档分页响应"""
     id =fields.UUID(dump_default="")
     name = fields.String(dump_default="")
-    charactor_count = fields.Integer(dump_default=0)
+    character_count = fields.Integer(dump_default=0)
     hit_count = fields.Integer(dump_default=0)
     position = fields.Integer(dump_default=0)
     enabled = fields.Boolean(dump_default=False)
@@ -211,5 +211,8 @@ class UpdateDocumentEnabledRequest(FlaskForm):
 
     def validate_enabled(self, field:BooleanField)->None:
         """校验字段"""
-        if not isinstance(field.data, bool):
+        if field.data is None:
+            # 如果没有提供enabled参数，设置默认值为False
+            field.data = False
+        elif not isinstance(field.data, bool):
             raise ValidationException("enabled格式错误")

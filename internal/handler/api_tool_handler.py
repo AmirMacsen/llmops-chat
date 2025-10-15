@@ -3,6 +3,7 @@ from uuid import UUID
 
 from injector import inject
 from flask import request
+from flask_login import login_required, current_user
 
 from internal.schema.api_tool_schema import ValidateOpenAPISchemaRequest, CreateOpenAPIToolSchemaRequest, \
     GetApiToolProviderResponse, GetApiToolResponse, GetApiToolProvidersWithPageRequest, \
@@ -18,6 +19,7 @@ class ApiToolHandler:
     """自定义API插件处理器"""
     api_tool_service: ApiToolService
 
+    @login_required
     def get_api_tool_providers_with_page(self):
         """
         获取API工具提供者列表信息，支持分页和搜索
@@ -129,12 +131,12 @@ class ApiToolHandler:
         req = GetApiToolProvidersWithPageRequest(request.args)
         if not req.validate():
             return validate_error_json(req.errors)
-        api_tool_providers, paginator = self.api_tool_service.get_api_tool_providers_with_page(req)
+        api_tool_providers, paginator = self.api_tool_service.get_api_tool_providers_with_page(req, current_user)
 
         resp = GetApiToolProvidersWithPageResponse(many=True)
         return success_json(data=PageModel(resp.dump(api_tool_providers), paginator=paginator))
 
-
+    @login_required
     def update_api_tool_provider(self, provider_id: UUID):
         """
         更新自定义API工具提供者信息
@@ -232,12 +234,11 @@ class ApiToolHandler:
         req = UpdateApiToolProviderRequest()
         if not req.validate():
             return validate_error_json(req.errors)
-        self.api_tool_service.update_api_tool_provider(provider_id, req)
+        self.api_tool_service.update_api_tool_provider(provider_id, req, current_user)
 
         return success_json(data="更新成功")
 
-
-
+    @login_required
     def create_open_api_tool_provider(self):
         """
         创建OpenAI工具
@@ -315,11 +316,10 @@ class ApiToolHandler:
             return validate_error_json(req.errors)
 
         # 调用服务创建API工具
-        self.api_tool_service.create_api_tool_provider(req)
+        self.api_tool_service.create_api_tool_provider(req, current_user)
         return success_json(data="创建自定义插件成功")
 
-
-
+    @login_required
     def get_api_tool(self, provider_id: UUID, tool_name:str):
         """
         获取指定工具详情
@@ -404,12 +404,11 @@ class ApiToolHandler:
                     data:
                       type: object
         """
-        api_tool = self.api_tool_service.get_api_tool(provider_id, tool_name)
+        api_tool = self.api_tool_service.get_api_tool(provider_id, tool_name, current_user)
         resp = GetApiToolResponse()
         return success_json(resp.dump(api_tool))
 
-
-
+    @login_required
     def get_api_tool_provider(self, provider_id: UUID):
         """
         获取工具提供者详情
@@ -477,11 +476,11 @@ class ApiToolHandler:
                     data:
                       type: object
         """
-        api_tool_provider = self.api_tool_service.get_api_tool_provider(provider_id)
+        api_tool_provider = self.api_tool_service.get_api_tool_provider(provider_id, current_user)
         resp = GetApiToolProviderResponse()
         return success_json(resp.dump(api_tool_provider))
 
-
+    @login_required
     def delete_api_tool_provider(self, provider_id: UUID):
         """
         删除API工具提供者
@@ -528,9 +527,10 @@ class ApiToolHandler:
                     data:
                       type: object
         """
-        self.api_tool_service.delete_api_tool_provider(provider_id)
+        self.api_tool_service.delete_api_tool_provider(provider_id, current_user)
         return success_json(data="删除成功")
 
+    @login_required
     def validate_open_ai_schema(self):
         """
         验证OpenAPI规范
@@ -587,5 +587,5 @@ class ApiToolHandler:
             return validate_error_json(req.errors)
 
         # 2.调用服务并解析对应的数据
-        schema = self.api_tool_service.parse_openapi_schema(req.openapi_schema.data)
+        schema = self.api_tool_service.parse_openapi_schema(req.openapi_schema.data, current_user)
         return success_json(schema)

@@ -11,7 +11,7 @@ from werkzeug.datastructures import FileStorage
 
 from internal.entity.upload_file_entity import ALLOW_FILE_EXTENSIONS, ALLOW_IMAGE_EXTENSIONS
 from internal.exception import FailedException
-from internal.model import UploadFile
+from internal.model import UploadFile, Account
 from internal.service import UploadFileService
 
 
@@ -59,9 +59,9 @@ class CosService:
 
 
 
-    def upload_file(self, file:FileStorage, only_image:bool=False)->UploadFile:
+    def upload_file(self, file:FileStorage, only_image:bool=False, account: Account = None)->UploadFile:
         """上传文件到cos"""
-        account_id="b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
 
         filename = file.filename
         extension = filename.split(".", 1)[-1]  if '.' in filename else ""
@@ -96,5 +96,3 @@ class CosService:
             mime_type=file.content_type,
             hash=hashlib.sha3_256(file_content).hexdigest()
         )
-
-

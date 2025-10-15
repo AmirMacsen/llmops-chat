@@ -8,7 +8,7 @@ from sqlalchemy import desc
 
 from internal.core.tools.api_tools.entities import OpenAPISchema, ToolEntity
 from internal.exception import ValidationException, NotFoundException
-from internal.model import ApiTool, ApiToolProvider
+from internal.model import ApiTool, ApiToolProvider, Account
 from internal.schema.api_tool_schema import CreateOpenAPIToolSchemaRequest, GetApiToolProvidersWithPageRequest, \
     UpdateApiToolProviderRequest
 from internal.service.base_service import BaseService
@@ -25,7 +25,7 @@ class ApiToolService(BaseService):
     api_provider_manager: ApiProviderManager
 
     @classmethod
-    def parse_openapi_schema(cls, openapi_schema_str:str) -> OpenAPISchema:
+    def parse_openapi_schema(cls, openapi_schema_str:str, account:Account) -> OpenAPISchema:
         """解析传入的openapi_schema字符串"""
 
         data = json.loads(openapi_schema_str.strip())
@@ -38,9 +38,9 @@ class ApiToolService(BaseService):
         response = OpenAPISchema(**data)
         return response
 
-    def get_api_tool_providers_with_page(self, req:GetApiToolProvidersWithPageRequest)->tuple[list[Any], Paginator]:
+    def get_api_tool_providers_with_page(self, req:GetApiToolProvidersWithPageRequest, account:Account)->tuple[list[Any], Paginator]:
         """获取自定义API工具提供者的列表"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id)
 
         # 分页查询器
         paginator = Paginator(db=self.db, req=req)
@@ -56,10 +56,10 @@ class ApiToolService(BaseService):
 
         return api_tool_providers, paginator
 
-    def update_api_tool_provider(self, provider_id: UUID, req:UpdateApiToolProviderRequest):
+    def update_api_tool_provider(self, provider_id: UUID, req:UpdateApiToolProviderRequest, account:Account):
         """更新工具提供者的信息"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
 
+        account_id = str(account.id)
         api_tool_provider = self.get(ApiToolProvider, provider_id)
         if api_tool_provider is None or str(api_tool_provider.account_id) != account_id:
             raise NotFoundException("provider未找到")
@@ -104,9 +104,9 @@ class ApiToolService(BaseService):
                 )
 
 
-    def get_api_tool(self, provider_id: UUID, tool_name:str):
+    def get_api_tool(self, provider_id: UUID, tool_name:str, account:Account):
         """根据提供的provider id 和 tool_name 获取工具的详情"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id)
 
         # 获取工具提供者信息
         api_tool = self.db.session.query(ApiTool).filter_by(
@@ -119,9 +119,9 @@ class ApiToolService(BaseService):
 
         return api_tool
 
-    def get_api_tool_provider(self, provider_id: UUID):
+    def get_api_tool_provider(self, provider_id: UUID, account:Account):
         """通过工具提供者的ID获取提供者的详情"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id)
 
         # 查询数据库获取对应的数据
         api_tool_provider = self.get(ApiToolProvider, provider_id)
@@ -129,9 +129,9 @@ class ApiToolService(BaseService):
             raise NotFoundException("provider未找到")
         return api_tool_provider
 
-    def delete_api_tool_provider(self, provider_id: UUID):
+    def delete_api_tool_provider(self, provider_id: UUID, account:Account):
         """删除工具提供者和工具的所有信息"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id)
         api_tool_provider = self.get(ApiToolProvider, provider_id)
         if api_tool_provider is None or str(api_tool_provider.account_id) != account_id:
             raise NotFoundException("provider未找到")
@@ -142,11 +142,10 @@ class ApiToolService(BaseService):
             ).delete()
             self.db.session.delete(api_tool_provider)
 
-    def create_api_tool_provider(self,req:CreateOpenAPIToolSchemaRequest):
+    def create_api_tool_provider(self,req:CreateOpenAPIToolSchemaRequest, account:Account):
         """根据传递的请求信息创建自定义的api 工具"""
 
-        # todo: 授权认证
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id)
 
         openapi_schema = self.parse_openapi_schema(req.openapi_schema.data)
 

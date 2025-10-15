@@ -14,7 +14,7 @@ from internal.entity.cache_entity import LOCK_DOCUMENT_UPDATE_ENABLED, LOCK_EXPI
 from internal.entity.dataset_entity import DocumentProcessType, SegmentStatus, DocumentStatus
 from internal.entity.upload_file_entity import ALLOW_FILE_EXTENSIONS
 from internal.lib.helper import datetime_to_timestamp
-from internal.model import Document, Dataset, UploadFile, ProcessRule, Segment
+from internal.model import Document, Dataset, UploadFile, ProcessRule, Segment, Account
 from internal.schema.document_schema import GetDocumentsWithPageRequest
 from internal.service.base_service import BaseService
 from internal.task import document_task
@@ -34,10 +34,11 @@ class DocumentService(BaseService):
     def create_document(self, dataset_id: UUID,
                         upload_file_ids: list[UUID],
                         process_type: str = DocumentProcessType.AUTOMIC,
-                        rule: dict = None
+                        rule: dict = None,
+                        account: Account = None
                         ) -> tuple[list[Document], str]:
         """根据传入的文档列表异步处理"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
 
         dataset = self.get(Dataset, dataset_id)
         if not dataset or str(dataset.account_id) != account_id:
@@ -92,9 +93,9 @@ class DocumentService(BaseService):
         # 返回文档列表和处理批次
         return documents, batch
 
-    def get_documents_status(self, dataset_id: UUID, batch: str) -> list[dict]:
+    def get_documents_status(self, dataset_id: UUID, batch: str, account: Account = None) -> list[dict]:
         """获取文档处理状态"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
 
         # 权限检测
         dataset = self.get(Dataset, dataset_id)
@@ -150,9 +151,10 @@ class DocumentService(BaseService):
 
         return documents_status
 
-    def get_document(self, dataset_id: UUID, document_id: UUID) -> Document:
+    def get_document(self, dataset_id: UUID, document_id: UUID, account: Account = None) -> Document:
         """获取文档信息"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+            
         # 权限检测
         dataset = self.get(Dataset, dataset_id)
         if not dataset or str(dataset.account_id) != account_id:
@@ -166,10 +168,11 @@ class DocumentService(BaseService):
             raise ForbiddenException("文档不属于该知识库")
         return document
 
-    def get_documents_with_page(self, dataset_id: UUID, req: GetDocumentsWithPageRequest) -> tuple[
+    def get_documents_with_page(self, dataset_id: UUID, req: GetDocumentsWithPageRequest, account: Account = None) -> tuple[
         list[Document], Paginator]:
         """根据传递的知识库ID获取分页数据"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+            
         # 权限检测
         dataset = self.get(Dataset, dataset_id)
         if not dataset or str(dataset.account_id) != account_id:
@@ -191,9 +194,10 @@ class DocumentService(BaseService):
         )
         return documents, paginator
 
-    def update_document(self, dataset_id: UUID, document_id: UUID, **kwargs) -> Document:
+    def update_document(self, dataset_id: UUID, document_id: UUID, account: Account = None, **kwargs) -> Document:
         """更新文档名称"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+            
         # 权限检测
         dataset = self.get(Dataset, dataset_id)
         if not dataset or str(dataset.account_id) != account_id:
@@ -208,9 +212,10 @@ class DocumentService(BaseService):
 
         return self.update(document, **kwargs)
 
-    def update_document_enabled(self, dataset_id: UUID, document_id: UUID, enabled: bool) -> Document:
+    def update_document_enabled(self, dataset_id: UUID, document_id: UUID, enabled: bool, account: Account = None) -> Document:
         """更新文档启用状态"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+            
         # 权限检测
         dataset = self.get(Dataset, dataset_id)
         if not dataset or str(dataset.account_id) != account_id:
@@ -228,9 +233,12 @@ class DocumentService(BaseService):
         if document.status != DocumentStatus.COMPLETED:
             raise ForbiddenException("文档正在处理中，暂时无法修改")
 
-        # 判断当前的文档的启用状态是否与当前传递的启用状态相反（如果相同，没必要处理，太废资源）
+        # 判断当前的文档的启用状态是否与当前传递的启用状态相同（如果相同，没必要处理）
+        print(f"Document current enabled status: {document.enabled}, Requested enabled status: {enabled}")
         if document.enabled == enabled:
-            raise ForbiddenException(f"文档已处于该状态 {'启用' if enabled else '禁用'}")
+            current_status = '启用' if document.enabled else '禁用'
+            target_status = '启用' if enabled else '禁用'
+            raise ForbiddenException(f"文档当前已处于{current_status}状态，无法再次设置为{target_status}")
 
         # 构建缓存锁名字，并检测是否上锁
         cache_key = LOCK_DOCUMENT_UPDATE_ENABLED.format(document_id=document_id)
@@ -247,9 +255,10 @@ class DocumentService(BaseService):
         return document
 
 
-    def delete_document(self, dataset_id: UUID, document_id: UUID) -> Document:
+    def delete_document(self, dataset_id: UUID, document_id: UUID, account: Account = None) -> Document:
         """删除文档 【文档、片段删除、词表更新、weaviate向量删除】"""
-        account_id = "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+        account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"
+            
         # 权限检测
         dataset = self.get(Dataset, dataset_id)
         if not dataset or str(dataset.account_id) != account_id:

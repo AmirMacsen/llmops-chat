@@ -3,6 +3,7 @@ import io
 from flask import send_file
 from injector import inject
 from dataclasses import dataclass
+from flask_login import login_required
 
 from internal.service import BuiltinToolsService
 from pkg.response import success_json
@@ -14,6 +15,7 @@ class BuiltinToolHandler:
     """内置工具处理"""
     builtin_tool_service: BuiltinToolsService
 
+    @login_required
     def get_builtin_tools(self, **kwargs):
         """
         获取所有内置工具
@@ -43,6 +45,7 @@ class BuiltinToolHandler:
         print(builtin_tools)
         return success_json(data=builtin_tools)
 
+    @login_required
     def get_provider_tool(self, provider_name:str, tool_name:str):
         """
         获取特定工具信息
@@ -83,6 +86,7 @@ class BuiltinToolHandler:
         return success_json(data=tools)
 
 
+    @login_required
     def get_provider_icon(self, provider_name:str):
         """
         获取提供商图标
@@ -112,6 +116,7 @@ class BuiltinToolHandler:
         return send_file(io.BytesIO(icon), mimetype)
 
 
+    @login_required
     def get_categories(self):
         """
         获取所有分类

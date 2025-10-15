@@ -79,10 +79,11 @@ class RetrievalService(BaseService):
             raise NotFoundException("检索策略不存在")
 
         # 添加知识库查询记录
-        for lc_document in lc_documents:
+        unique_dataset_ids = list(set(str(lc_document.metadata["dataset_id"]) for lc_document in lc_documents))
+        for dataset_id in unique_dataset_ids:
             self.create(
                 DatasetQuery,
-                dataset_id=lc_document.metadata["dataset_id"],
+                dataset_id=dataset_id,
                 query=query,
                 source=retrieval_source,
                 source_app_id=None,
