@@ -1,6 +1,6 @@
 from injector import inject
 from dataclasses import dataclass
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from internal.schema.upload_file_schema import UploadFileRequest, UploadFileResponse, UploadImageRequest
 from internal.service import CosService
@@ -95,7 +95,7 @@ class UploadFileHandler:
             return validate_error_json(request.errors)
 
         # 构建请求并校验
-        file = self.cos_service.upload_file(request.file.data)
+        file = self.cos_service.upload_file(request.file.data, account=current_user)
         # 调用服务上传文件
         response = UploadFileResponse()
 
@@ -159,7 +159,7 @@ class UploadFileHandler:
         request = UploadImageRequest()
         if not request.validate():
             return validate_error_json(request.errors)
-        upload_file = self.cos_service.upload_file(request.file.data, only_image=True)
+        upload_file = self.cos_service.upload_file(request.file.data, only_image=True, account=current_user)
 
         # 获取图片的实际URL地址
         url = self.cos_service.get_file_url(upload_file.key)

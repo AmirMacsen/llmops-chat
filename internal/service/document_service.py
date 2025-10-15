@@ -32,10 +32,10 @@ class DocumentService(BaseService):
     redis_client: Redis
 
     def create_document(self, dataset_id: UUID,
+                        account: Account,
                         upload_file_ids: list[UUID],
                         process_type: str = DocumentProcessType.AUTOMIC,
                         rule: dict = None,
-                        account: Account = None
                         ) -> tuple[list[Document], str]:
         """根据传入的文档列表异步处理"""
         account_id = str(account.id) if account else "b03d55b5-895e-47c8-b767-6d0015ae60a1"

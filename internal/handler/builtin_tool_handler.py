@@ -42,7 +42,6 @@ class BuiltinToolHandler:
         """
         """获取所有内置工具信息+提供商信息"""
         builtin_tools = self.builtin_tool_service.get_builtin_tools()
-        print(builtin_tools)
         return success_json(data=builtin_tools)
 
     @login_required

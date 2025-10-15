@@ -1,31 +1,28 @@
 import dataclasses
 import json
 import uuid
-from operator import itemgetter
 from queue import Queue
 from threading import Thread
 from typing import Any, Dict, Generator
 
 from flask import request
+from flask_login import login_required, current_user
 from injector import inject
 from langchain.memory import ConversationBufferWindowMemory
 from langchain_community.chat_message_histories import FileChatMessageHistory
 from langchain_core.memory import BaseMemory
-from langchain_core.messages import AnyMessage
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, PromptTemplate
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda, RunnableConfig
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tracers import Run
 from langchain_openai import ChatOpenAI
 from langgraph.graph import MessagesState
 
-from flask_login import login_required, current_user
+from internal.core.tools.builtin_tools.providers import BuiltinProviderManager
 from internal.model import App
 from internal.schema.app_schema import CompletionRequest
 from internal.service import AppService, ApiToolService, ConversationService
-from internal.task.demo_task import demo_task
 from pkg.response import success_json, validate_error_json, success_message
-from internal.core.tools.builtin_tools.providers import BuiltinProviderManager
 
 
 @inject
@@ -62,7 +59,7 @@ class AppHandler(object):
                       type: string
                       example: "应用已经成功创建，id为xxx"
         """
-        app = self.app_service.create_app()
+        app = self.app_service.create_app(account=current_user)
         return success_message(f"应用已经成功创建，id为{app.id}")
 
     @login_required
@@ -113,7 +110,7 @@ class AppHandler(object):
         if not app_id:
             return validate_error_json(errors={'app_id': '应用id不能为空'})
 
-        app = self.app_service.get_app(app_id)
+        app = self.app_service.get_app(app_id, account=current_user)
         return success_message(f"应用已经成功找到，名字为{app.name}")
 
 
@@ -149,7 +146,7 @@ class AppHandler(object):
                       type: string
                       example: "应用已经成功更新，名字为xxx"
         """
-        app = self.app_service.update_app(app_id)
+        app = self.app_service.update_app(app_id, account=current_user)
         return success_message(f"应用已经成功更新，名字为{app.name}")
 
 

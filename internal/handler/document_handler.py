@@ -3,7 +3,7 @@ from uuid import UUID
 from injector import inject
 from dataclasses import dataclass
 from flask import request
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from internal.schema.document_schema import CreateDocumentsRequest, CreateDocumentsResponse, GetDocumentResponse, \
     UpdateDocumentNameRequest, GetDocumentsWithPageRequest, GetDocumentsWithPageResponse, UpdateDocumentEnabledRequest
@@ -30,7 +30,9 @@ class DocumentHandler:
         # 调用服务并创建文档，返回文档信息列表+批次
         documents,batch = self.document_service.create_document(
             dataset_id=dataset_id,
-            **request.data
+            account=current_user,
+            **request.data,
+
         )
 
         response = CreateDocumentsResponse()
@@ -40,7 +42,7 @@ class DocumentHandler:
     @login_required
     def get_documents_status(self, dataset_id:UUID, batch:str):
         """根据传递的知识库id和批处理标识获取文档的状态"""
-        documents_status = self.document_service.get_documents_status(dataset_id, batch)
+        documents_status = self.document_service.get_documents_status(dataset_id, batch, current_user)
 
         return success_json(documents_status)
 
@@ -48,7 +50,7 @@ class DocumentHandler:
     @login_required
     def get_document(self, dataset_id:UUID, document_id:UUID):
         """根据传递的知识库ID和文档iD获取文档"""
-        document = self.document_service.get_document(dataset_id, document_id)
+        document = self.document_service.get_document(dataset_id, document_id, current_user)
         response = GetDocumentResponse()
         return success_json(response.dump(document))
 
@@ -60,7 +62,7 @@ class DocumentHandler:
         if not request.validate():
             return validate_error_json(request.errors)
         self.document_service.update_document(dataset_id, document_id,
-                                                   name=request.name.data)
+                                                   name=request.name.data, account=current_user)
         return success_json(data="更新数据成功")
 
 
@@ -71,7 +73,7 @@ class DocumentHandler:
         req = GetDocumentsWithPageRequest(request.args)
         if not req.validate():
             return validate_error_json(req.errors)
-        documents, paginator = self.document_service.get_documents_with_page(dataset_id, req)
+        documents, paginator = self.document_service.get_documents_with_page(dataset_id, req, current_user)
         response = GetDocumentsWithPageResponse(many=True)
         return success_json(PageModel(list=response.dump(documents), paginator=paginator))
 
@@ -87,12 +89,12 @@ class DocumentHandler:
             return validate_error_json(req.errors)
 
         # 调用服务更改指定文档的状态
-        self.document_service.update_document_enabled(dataset_id, document_id, req.enabled.data)
+        self.document_service.update_document_enabled(dataset_id, document_id, req.enabled.data, current_user)
         return success_json(data="更改文档启用状态成功")
 
 
     @login_required
     def delete_document(self, dataset_id:UUID, document_id:UUID):
         """根据传递的documentid和datasetid删除文档"""
-        self.document_service.delete_document(dataset_id, document_id)
+        self.document_service.delete_document(dataset_id, document_id, current_user)
         return success_json(data="删除文档成功")

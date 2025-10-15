@@ -1,6 +1,6 @@
 from uuid import UUID
 from flask import request
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from injector import inject
 from dataclasses import dataclass
@@ -27,7 +27,7 @@ class SegmentHandler:
             return validate_error_json(req.errors)
 
         # 调用服务
-        segments, paginator = self.segment_service.get_segment_with_page(dataset_id, document_id, req)
+        segments, paginator = self.segment_service.get_segment_with_page(dataset_id, document_id, req, current_user)
 
         response = GetSegmentWithPageResponse(many=True)
         return success_json(PageModel(list=response.dump(segments), paginator=paginator))
@@ -36,7 +36,7 @@ class SegmentHandler:
     @login_required
     def get_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID):
         """获取指定的文档片段信息"""
-        segment = self.segment_service.get_segment(dataset_id, document_id, segment_id)
+        segment = self.segment_service.get_segment(dataset_id, document_id, segment_id, current_user)
         resp = GetSegmentResponse()
         return success_json(resp.dump(segment))
 
@@ -49,7 +49,7 @@ class SegmentHandler:
             return validate_error_json(req.errors)
 
         # 2.调用服务更新文档片段的启用状态
-        self.segment_service.update_segment_enabled(dataset_id, document_id, segment_id, req.enabled.data)
+        self.segment_service.update_segment_enabled(dataset_id, document_id, segment_id, req.enabled.data, current_user)
 
         return success_message("修改片段状态成功")
 
@@ -73,12 +73,12 @@ class SegmentHandler:
         if not req.validate():
             return validate_error_json(req.errors)
 
-        self.segment_service.update_segment(dataset_id, document_id, segment_id, req)
+        self.segment_service.update_segment(dataset_id, document_id, segment_id, req, current_user)
         return success_message("更新文档片段成功")
 
 
     @login_required
     def delete_segment(self, dataset_id: UUID, document_id: UUID, segment_id: UUID):
         """根据传递的信息删除指定的片段"""
-        self.segment_service.delete_segment(dataset_id, document_id, segment_id)
+        self.segment_service.delete_segment(dataset_id, document_id, segment_id, current_user)
         return success_message("删除片段成功")
