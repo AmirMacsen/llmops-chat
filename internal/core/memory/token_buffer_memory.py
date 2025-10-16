@@ -32,7 +32,7 @@ class TokenBufferMemory:
         messages = self.db.session.query(Message).filter(
             Message.conversation_id == self.conversation.id,
             Message.answer != "",
-            Message.deleted_at.is_(None),
+            Message.is_deleted == False,
             Message.status == MessageStatus.NORMAL,
         ).order_by(desc("created_at")).limit(message_limit).all()
 

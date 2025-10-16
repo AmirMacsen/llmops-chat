@@ -1,25 +1,94 @@
-from abc import ABC, abstractmethod
+import uuid
+from abc import abstractmethod
+from threading import Thread
+from typing import Optional, Any, Iterator
 
-from langchain_core.messages import AnyMessage
+from langchain_core.language_models import BaseLanguageModel
+from langchain_core.load import Serializable
+from langchain_core.runnables import Runnable, RunnableConfig
+from langchain_core.runnables.utils import Input
+from langgraph.graph.state import CompiledStateGraph
+from pydantic import PrivateAttr
 
 from internal.core.agent.entities.agent_entity import AgentConfig
+from internal.exception import FailedException
+from .agent_queue_manager import AgentQueueManager
+from ..entities.queue_entity import AgentResult, AgentThought
 
 
-class BaseAgent(ABC):
+class BaseAgent(Serializable, Runnable):
     """
     Abstract base class for all agents.
     """
+    llm: BaseLanguageModel
     agent_config: AgentConfig
+    _agent: CompiledStateGraph = PrivateAttr(None)
+    _agent_queue_manager: AgentQueueManager = PrivateAttr(None)
 
-    def __init__(self, agent_config: AgentConfig):
-        self.agent_config = agent_config
+    class Config:
+        """Config for BaseAgent"""
+        arbitrary_types_allowed = True
+
+    def __init__(
+            self,
+            llm: BaseLanguageModel,
+            agent_config: AgentConfig,
+            *args,
+            **kwargs
+    ):
+        """构造函数，初始化智能体图结构程序"""
+        super().__init__(*args, llm=llm, agent_config=agent_config, **kwargs)
+        self._agent = self._build_agent()
+        self._agent_queue_manager = AgentQueueManager(
+            user_id=agent_config.user_id,
+            invoke_from=agent_config.invoke_from,
+        )
 
     @abstractmethod
-    def run(self,query:str,
-            history:list[AnyMessage]=None,
-            long_term_memory:str="",
-            ) -> str:
+    def _build_agent(self) -> CompiledStateGraph:
         """
-        Run the agent with the given input.
+        Build the agent graph structure.
         """
-        raise NotImplementedError("Agent的运行函数未实现")
+        raise NotImplementedError("Agent的构建函数未实现")
+
+
+    def invoke(
+        self,
+        input: Input,
+        config: Optional[RunnableConfig] = None,
+        **kwargs: Any,
+    ) -> AgentResult:
+        """块内容响应"""
+
+
+    def stream(
+        self,
+        input: Input,
+        config: Optional[RunnableConfig] = None,
+        **kwargs: Optional[Any],
+    ) -> Iterator[AgentThought]:
+        """流式输出"""
+        # 检测子类是否已经构建agent
+        if not self._agent:
+            raise FailedException("智能体未构建")
+
+        # 构建对应的任务id并初始化
+        input["task_id"] = input.get("task_id", str(uuid.uuid4()))
+        input["history"] = input.get("history", [])
+        input["iteration_count"] = input.get("iteration_count", 0)
+
+        # 创建子线程并执行
+        thread = Thread(
+            target=self._agent.invoke,
+            args=(input,),
+            kwargs=kwargs,
+        )
+        thread.start()
+
+        # 监听队列
+        yield from self._agent_queue_manager.listen(input["task_id"])
+
+    @property
+    def agent_queue_manager(self) -> AgentQueueManager:
+        """获取队列管理器"""
+        return self._agent_queue_manager

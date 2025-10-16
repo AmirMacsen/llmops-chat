@@ -51,13 +51,13 @@ class UpdateApiToolProviderRequest(FlaskForm):
 
 class GetApiToolProvidersWithPageResponse(Schema):
     """获取API工具提供商列表响应"""
-    id = fields.UUID(description="服务提供商ID")
-    name = fields.Str(description="提供商名称")
-    icon = fields.Str(description="提供商图标")
-    description = fields.Str(description="提供商描述")
-    headers = fields.List(fields.Dict, default={}, description="请求头")
-    tools = fields.List(fields.Dict, default={}, description="工具列表")
-    created_at = fields.Int(default=0, description="创建时间")
+    id = fields.UUID(metadata={"description": "服务提供商ID"})
+    name = fields.Str(metadata={"description": "提供商名称"})
+    icon = fields.Str(metadata={"description": "提供商图标"})
+    description = fields.Str(metadata={"description": "提供商描述"})
+    headers = fields.List(fields.Dict, dump_default={}, metadata={"description": "请求头"})
+    tools = fields.List(fields.Dict, dump_default={}, metadata={"description": "工具列表"})
+    created_at = fields.Int(dump_default=0, metadata={"description": "创建时间"})
 
     @pre_dump
     def process_data(self, data:ApiToolProvider, **kwargs):
@@ -108,12 +108,12 @@ class CreateOpenAPIToolSchemaRequest(FlaskForm):
 
 class GetApiToolProviderResponse(Schema):
     """获取API工具提供商响应"""
-    id = fields.UUID(description="服务提供商ID")
-    name = fields.Str(description="提供商名称")
-    icon = fields.Str(description="提供商图标")
-    openapi_schema = fields.Str(description="OpenAPI规范")
-    headers = fields.List(fields.Dict(),default=[], description="请求头")
-    created_at = fields.Int(default=0, description="创建时间")
+    id = fields.UUID(metadata={"description": "服务提供商ID"})
+    name = fields.Str(metadata={"description": "提供商名称"})
+    icon = fields.Str(metadata={"description": "提供商图标"})
+    openapi_schema = fields.Str(metadata={"description": "OpenAPI规范"})
+    headers = fields.List(fields.Dict(), dump_default=[], metadata={"description": "请求头"})
+    created_at = fields.Int(dump_default=0, metadata={"description": "创建时间"})
 
     @pre_dump
     def process_data(self, data:ApiToolProvider, **kwargs):
@@ -129,11 +129,11 @@ class GetApiToolProviderResponse(Schema):
 
 class GetApiToolResponse(Schema):
     """获取API工具参数详情"""
-    id = fields.UUID(description="工具ID")
-    name = fields.Str(description="工具名称")
-    description = fields.Str(description="工具描述")
-    inputs = fields.List(fields.Dict(), default=[], description="工具参数")
-    provider = fields.Dict(description="工具提供者信息")
+    id = fields.UUID(metadata={"description": "工具ID"})
+    name = fields.Str(metadata={"description": "工具名称"})
+    description = fields.Str(metadata={"description": "工具描述"})
+    inputs = fields.List(fields.Dict(), dump_default=[], metadata={"description": "工具参数"})
+    provider = fields.Dict(metadata={"description": "工具提供者信息"})
 
     @pre_dump
     def process_data(self, data:ApiTool, **kwargs):

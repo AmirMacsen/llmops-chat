@@ -1,8 +1,13 @@
+from uuid import UUID
+
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.messages import AnyMessage
 from langchain_core.tools import BaseTool
 from langgraph.graph import MessagesState
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
+
+from internal.entity.app_entity import DEFAULT_APP_CONFIG
+from internal.entity.conversation_entity import InvokeFrom
 
 AGENT_SYSTEM_PROMPT_TEMPLATE = """你是一个高度定制的智能体应用，旨在为用户提供准确、专业的内容生成和问题解答，请严格遵守以下规则：
 
@@ -37,11 +42,25 @@ class AgentConfig(BaseModel):
     system_prompt:str = AGENT_SYSTEM_PROMPT_TEMPLATE
     preset_prompt:str= ""  # 用户调用时传入
     enable_long_term_memory:bool = False  # 是否开启长期记忆
-    llm:BaseLanguageModel
     tools:list[BaseTool] = Field(default_factory=list)
+    # 用户标识
+    user_id: UUID
+    invoke_from: InvokeFrom = InvokeFrom.WEB_APP
+    # 审核配置
+    review_config: dict = Field(default_factory=lambda :DEFAULT_APP_CONFIG["review_config"])
 
+    # 最大迭代次数
+    max_iteration_count: int = 5
 
 class AgentState(MessagesState):
     """智能体状态类"""
+    task_id: UUID # 状态与任务关联
+    iteration_count: int # 迭代次数，记录执行了多少次工具调用
     history:list[AnyMessage]
     long_term_memory:str
+
+
+DATASET_RETRIEVAL_TOOL_NAME="dataset_retrieval"
+
+# agent超过最大迭代次数时提示内容
+MAX_ITERATION_RESPONSE = "当前Agent迭代次数已经超过限制，请重试"

@@ -23,7 +23,7 @@ class App(db.Model):
         PrimaryKeyConstraint("id", name="pk_app_id"),
     )
 
-    id = Column(UUID, nullable=False, server_default=text("uuid_generate_v4()"))
+    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     account_id = Column(UUID, nullable=False)  # 创建账号id
     app_config_id = Column(UUID, nullable=True)  # 发布配置id，当值为空时代表没有发布
     draft_app_config_id = Column(UUID, nullable=True)  # 关联的草稿配置id
@@ -51,14 +51,16 @@ class App(db.Model):
 
         # 2.检测配置是否存在，如果不存在则创建一个默认值
         if not app_config_version:
-            app_config_version = AppConfigVersion(
-                app_id=self.id,
-                version=0,
-                config_type=AppConfigType.DRAFT,
-                **DEFAULT_APP_CONFIG
-            )
-            db.session.add(app_config_version)
-            db.session.commit()
+            # 在自动创建配置时也需要使用数据库事务上下文
+            with db.auto_commit():
+                app_config_version = AppConfigVersion(
+                    app_id=self.id,
+                    version=0,
+                    config_type=AppConfigType.DRAFT,
+                    **DEFAULT_APP_CONFIG
+                )
+                db.session.add(app_config_version)
+                db.session.commit()
 
         return app_config_version
 
@@ -100,7 +102,7 @@ class AppConfig(db.Model):
         PrimaryKeyConstraint("id", name="pk_app_config_id"),
     )
 
-    id = Column(UUID, nullable=False, server_default=text("uuid_generate_v4()"))  # 配置id
+    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))  # 配置id
     app_id = Column(UUID, nullable=False)  # 关联应用id
     model_config = Column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))  # 模型配置
     dialog_round = Column(Integer, nullable=False, server_default=text("0"))  # 鞋带上下文轮数
@@ -130,7 +132,7 @@ class AppConfigVersion(db.Model):
         PrimaryKeyConstraint("id", name="pk_app_config_version_id"),
     )
 
-    id = Column(UUID, nullable=False, server_default=text("uuid_generate_v4()"))  # 配置id
+    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))  # 配置id
     app_id = Column(UUID, nullable=False)  # 关联应用id
     model_config = Column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))  # 模型配置
     dialog_round = Column(Integer, nullable=False, server_default=text("0"))  # 鞋带上下文轮数
@@ -163,7 +165,7 @@ class AppDatasetJoin(db.Model):
         PrimaryKeyConstraint("id", name="pk_app_dataset_join_id"),
     )
 
-    id = Column(UUID, nullable=False, server_default=text("uuid_generate_v4()"))
+    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
     app_id = Column(UUID, nullable=False)
     dataset_id = Column(UUID, nullable=False)
     updated_at = Column(

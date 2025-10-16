@@ -127,6 +127,7 @@ class DatasetService(BaseService):
         # 执行检索
         lc_documents = self.retrieval_service.search_in_datasets(
             dataset_ids=[dataset_id],
+            account_id=account.id,
             **req.data
         )
 
