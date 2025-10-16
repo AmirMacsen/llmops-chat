@@ -48,7 +48,7 @@ class ConversationService(BaseService):
 
         # 调低大模型的温度
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        structured_llm = llm.with_structured_output(output_cls=ConversationInfo)
+        structured_llm = llm.with_structured_output(schema=ConversationInfo)
 
         chain = prompt | structured_llm
 
@@ -85,7 +85,7 @@ class ConversationService(BaseService):
 
         # 2.构建大语言模型实例，并且将大语言模型的温度调低，降低幻觉的概率
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        structured_llm = llm.with_structured_output(SuggestedQuestions)
+        structured_llm = llm.with_structured_output(schema=SuggestedQuestions)
 
         # 3.构建链应用
         chain = prompt | structured_llm

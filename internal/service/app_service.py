@@ -456,6 +456,7 @@ class AppService(BaseService):
 
         # 2.获取应用的最新草稿配置信息
         draft_app_config = self.get_draft_app_config(app_id, account)
+        print(f"draft_app_config: {draft_app_config}")
 
         # 3.获取当前应用的调试会话信息
         debug_conversation = app.debug_conversation
