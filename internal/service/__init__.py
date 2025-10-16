@@ -15,6 +15,9 @@ from .conversation_service import ConversationService
 from .jwt_service import JwtService
 from .account_service import AccountService
 from .oauth_service import OAuthService
+from .ai_service import AIService
+from .api_key_service import ApiKeyService
+from .openapi_service import OpenAPIService
 
 __all__ = ["AppService",
            "BuiltinToolsService",
@@ -32,5 +35,8 @@ __all__ = ["AppService",
            "ConversationService",
            "JwtService",
            "AccountService",
-           "OAuthService"
+           "OAuthService",
+           "AIService",
+           "ApiKeyService",
+           "OpenAPIService"
            ]

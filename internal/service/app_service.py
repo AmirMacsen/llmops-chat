@@ -12,10 +12,9 @@ from langchain_openai import ChatOpenAI
 from redis import Redis
 from sqlalchemy import func, desc
 
-from internal.core.agent.agents import FunctionCallAgent
+from internal.core.agent.agents import FunctionCallAgent, AgentQueueManager
 from internal.core.agent.entities.agent_entity import AgentConfig
 from internal.core.memory import TokenBufferMemory
-from internal.core.tools.api_tools.entities import ToolEntity
 from internal.core.tools.api_tools.providers import ApiProviderManager
 from internal.core.tools.builtin_tools.providers import BuiltinProviderManager
 from internal.entity.app_entity import AppStatus, AppConfigType, DEFAULT_APP_CONFIG
@@ -25,9 +24,11 @@ from internal.exception import NotFoundException, ForbiddenException, Validation
 from internal.lib.helper import datetime_to_timestamp
 from internal.model import App, Account, AppConfigVersion, ApiTool, Dataset, AppConfig, AppDatasetJoin, Conversation, \
     Message, MessageAgentThought
-from internal.schema.app_schema import CreateAppReq, GetPublishHistoriesWithPageReq
+from internal.schema.app_schema import CreateAppReq, GetPublishHistoriesWithPageReq, \
+    GetDebugConversationMessagesWithPageReq
 from pkg.paginator import Paginator
 from pkg.sqlalchemy import SQLAlchemy
+from .app_config_service import AppConfigService
 from .base_service import BaseService
 from .conversation_service import ConversationService
 from .retrieval_service import RetrievalService
@@ -44,7 +45,7 @@ class AppService(BaseService):
     retrieval_service: RetrievalService
     api_provider_manager: ApiProviderManager
     builtin_provider_manager: BuiltinProviderManager
-    conversation_service: ConversationService
+    app_config_service: AppConfigService
 
     def create_app(self, req: CreateAppReq, account: Account) -> App:
         """创建Agent应用服务"""
@@ -99,143 +100,8 @@ class AppService(BaseService):
         """根据传递的应用id，获取指定的应用草稿配置信息"""
         # 1.获取应用信息并校验权限
         app = self.get_app(app_id, account)
+        return self.app_config_service.get_draft_app_config(app)
 
-        # 2.提取应用的草稿配置
-        draft_app_config = app.draft_app_config
-
-        # todo:3.校验model_config配置信息，等待多LLM实现的时候再来完成
-
-        # 4.循环遍历工具列表删除已经被删除的工具信息
-        draft_tools = draft_app_config.tools
-        validate_tools = []
-        tools = []
-        for draft_tool in draft_tools:
-            if draft_tool["type"] == "builtin_tool":
-                # 5.查询内置工具提供者，并检测是否存在
-                provider = self.builtin_provider_manager.get_provider(draft_tool["provider_id"])
-                if not provider:
-                    continue
-
-                # 6.获取提供者下的工具实体，并检测是否存在
-                tool_entity = provider.get_tool_entity(draft_tool["tool_id"])
-                if not tool_entity:
-                    continue
-
-                # 7.判断工具的params和草稿中的params是否一致，如果不一致则全部重置为默认值（或者考虑删除这个工具的引用）
-                param_keys = set([param.name for param in tool_entity.params])
-                params = draft_tool["params"]
-                if set(draft_tool["params"].keys()) - param_keys:
-                    params = {
-                        param.name: param.default
-                        for param in tool_entity.params
-                        if param.default is not None
-                    }
-
-                # 8.数据都存在，并且参数已经校验完毕，可以将数据添加到validate_tools
-                validate_tools.append({**draft_tool, "params": params})
-
-                # 9.组装内置工具展示信息
-                provider_entity = provider.provider_entity
-                tools.append({
-                    "type": "builtin_tool",
-                    "provider": {
-                        "id": provider_entity.name,
-                        "name": provider_entity.name,
-                        "label": provider_entity.label,
-                        "icon": f"{request.scheme}://{request.host}/builtin-tools/{provider_entity.name}/icon",
-                        "description": provider_entity.description,
-                    },
-                    "tool": {
-                        "id": tool_entity.name,
-                        "name": tool_entity.name,
-                        "label": tool_entity.label,
-                        "description": tool_entity.description,
-                        "params": draft_tool["params"],
-                    }
-                })
-            elif draft_tool["type"] == "api_tool":
-                # 10.查询数据库获取对应的工具记录，并检测是否存在
-                tool_record = self.db.session.query(ApiTool).filter(
-                    ApiTool.provider_id == draft_tool["provider_id"],
-                    ApiTool.name == draft_tool["tool_id"],
-                ).one_or_none()
-                if not tool_record:
-                    continue
-
-                # 11.数据校验通过，往validate_tools中添加数据
-                validate_tools.append(draft_tool)
-
-                # 12.组装api工具展示信息
-                provider = tool_record.provider
-                tools.append({
-                    "type": "api_tool",
-                    "provider": {
-                        "id": str(provider.id),
-                        "name": provider.name,
-                        "label": provider.name,
-                        "icon": provider.icon,
-                        "description": provider.description,
-                    },
-                    "tool": {
-                        "id": str(tool_record.id),
-                        "name": tool_record.name,
-                        "label": tool_record.name,
-                        "description": tool_record.description,
-                        "params": {},
-                    },
-                })
-
-        # 13.判断是否需要更新草稿配置中的工具列表信息
-        if draft_tools != validate_tools:
-            # 14.更新草稿配置中的工具列表
-            self.update(draft_app_config, tools=validate_tools)
-
-        # 15.校验知识库列表，如果引用了不存在/被删除的知识库，需要剔除数据并更新，同时获取知识库的额外信息
-        datasets = []
-        draft_datasets = draft_app_config.datasets
-        dataset_records = self.db.session.query(Dataset).filter(Dataset.id.in_(draft_datasets)).all()
-        dataset_dict = {str(dataset_record.id): dataset_record for dataset_record in dataset_records}
-        dataset_sets = set(dataset_dict.keys())
-
-        # 16.计算存在的知识库id列表，为了保留原始顺序，使用列表循环的方式来判断
-        exist_dataset_ids = [dataset_id for dataset_id in draft_datasets if dataset_id in dataset_sets]
-
-        # 17.判断是否存在已删除的知识库，如果存在则更新
-        if set(exist_dataset_ids) != set(draft_datasets):
-            self.update(draft_app_config, datasets=exist_dataset_ids)
-
-        # 18.循环获取知识库数据
-        for dataset_id in exist_dataset_ids:
-            dataset = dataset_dict.get(str(dataset_id))
-            datasets.append({
-                "id": str(dataset.id),
-                "name": dataset.name,
-                "icon": dataset.icon,
-                "description": dataset.description,
-            })
-
-        # todo:19.校验工作流列表对应的数据
-        workflows = []
-
-        # 20.将数据转换成字典后返回
-        return {
-            "id": str(draft_app_config.id),
-            "model_config": draft_app_config.model_config,
-            "dialog_round": draft_app_config.dialog_round,
-            "preset_prompt": draft_app_config.preset_prompt,
-            "tools": tools,
-            "workflows": workflows,
-            "datasets": datasets,
-            "retrieval_config": draft_app_config.retrieval_config,
-            "long_term_memory": draft_app_config.long_term_memory,
-            "opening_statement": draft_app_config.opening_statement,
-            "opening_questions": draft_app_config.opening_questions,
-            "speech_to_text": draft_app_config.speech_to_text,
-            "text_to_speech": draft_app_config.text_to_speech,
-            "review_config": draft_app_config.review_config,
-            "updated_at": datetime_to_timestamp(draft_app_config.updated_at),
-            "created_at": datetime_to_timestamp(draft_app_config.created_at),
-        }
 
     def update_draft_app_config(
             self,
@@ -456,28 +322,28 @@ class AppService(BaseService):
 
         # 2.获取应用的最新草稿配置信息
         draft_app_config = self.get_draft_app_config(app_id, account)
-        print(f"draft_app_config: {draft_app_config}")
 
         # 3.获取当前应用的调试会话信息
         debug_conversation = app.debug_conversation
 
-        # 新建一条消息记录
+        # 4.新建一条消息记录
         message = self.create(
             Message,
             app_id=app_id,
             conversation_id=debug_conversation.id,
+            invoke_from=InvokeFrom.DEBUGGER,
             created_by=account.id,
             query=query,
             status=MessageStatus.NORMAL,
         )
 
-        # todo:4.根据传递的model_config实例化不同的LLM模型，等待多LLM接入后该处会发生变化
+        # todo:5.根据传递的model_config实例化不同的LLM模型，等待多LLM接入后该处会发生变化
         llm = ChatOpenAI(
             model=draft_app_config["model_config"]["model"],
             **draft_app_config["model_config"]["parameters"],
         )
 
-        # 5.实例化TokenBufferMemory用于提取短期记忆
+        # 6.实例化TokenBufferMemory用于提取短期记忆
         token_buffer_memory = TokenBufferMemory(
             db=self.db,
             conversation=debug_conversation,
@@ -487,51 +353,23 @@ class AppService(BaseService):
             message_limit=draft_app_config["dialog_round"],
         )
 
-        # 6.将草稿配置中的tools转换成LangChain工具
-        tools = []
-        for tool in draft_app_config["tools"]:
-            # 7.根据不同的工具类型执行不同的操作
-            if tool["type"] == "builtin_tool":
-                # 8.内置工具，通过builtin_provider_manager获取工具实例
-                builtin_tool = self.builtin_provider_manager.get_tool(
-                    tool["provider"]["id"],
-                    tool["tool"]["name"]
-                )
-                if not builtin_tool:
-                    continue
-                tools.append(builtin_tool(**tool["tool"]["params"]))
-            else:
-                # 9.API工具，首先根据id找到ApiTool记录，然后创建示例
-                api_tool = self.get(ApiTool, tool["tool"]["id"])
-                if not api_tool:
-                    continue
-                tools.append(
-                    self.api_provider_manager.get_tool(
-                        ToolEntity(
-                            id=str(api_tool.id),
-                            name=api_tool.name,
-                            url=api_tool.url,
-                            method=api_tool.method,
-                            description=api_tool.description,
-                            headers=api_tool.provider.headers,
-                            parameters=api_tool.parameters,
-                        )
-                    )
-                )
+        # 7.将草稿配置中的tools转换成LangChain工具
+        tools = self.app_config_service.get_langchain_tools_by_tools_config(draft_app_config["tools"])
 
-        # 10.检测是否关联了知识库
+        # 8.检测是否关联了知识库
         if draft_app_config["datasets"]:
-            # 11.构建LangChain知识库检索工具
+            # 9.构建LangChain知识库检索工具
             dataset_retrieval = self.retrieval_service.create_langchain_tool_from_search(
                 flask_app=current_app._get_current_object(),
+                query=query,
                 dataset_ids=[dataset["id"] for dataset in draft_app_config["datasets"]],
                 account_id=account.id,
-                retrival_source=RetrievalSource.APP,
+                retrieval_source=RetrievalSource.APP,
                 **draft_app_config["retrieval_config"],
             )
             tools.append(dataset_retrieval)
 
-        # todo:12.构建Agent智能体，目前暂时使用FunctionCallAgent
+        # todo:10.构建Agent智能体，目前暂时使用FunctionCallAgent
         agent = FunctionCallAgent(
             llm=llm,
             agent_config=AgentConfig(
@@ -549,76 +387,94 @@ class AppService(BaseService):
             "history": history,
             "long_term_memory": debug_conversation.summary,
         }):
+            # 11.提取thought以及answer
             event_id = str(agent_thought.id)
 
-            # 将数据填充到agent_thought中，便于存储到数据库服务中
+            # 12.将数据填充到agent_thought，便于存储到数据库服务中
             if agent_thought.event != QueueEvent.PING:
-                # 除了agent_message数据叠加，其他均为覆盖
+                # 13.除了agent_message数据为叠加，其他均为覆盖
                 if agent_thought.event == QueueEvent.AGENT_MESSAGE:
                     if event_id not in agent_thoughts:
-                        agent_thoughts[event_id] = {
-                            "id": event_id,
-                            "task_id": str(agent_thought.task_id),
-                            "event": agent_thought.event,
-                            "thought": agent_thought.thought,
-                            "observation": agent_thought.observation,
-                            "tool": agent_thought.tool,
-                            "tool_input": agent_thought.tool_input,
-                            "message": agent_thought.message,
-                            "answer": agent_thought.answer,
-                            "latency": agent_thought.latency,
-                        }
+                        # 14.初始化智能体消息事件
+                        agent_thoughts[event_id] = agent_thought
                     else:
-                        agent_thoughts[event_id] = {
-                            **agent_thoughts[event_id],
-                            "thought": agent_thoughts[event_id]["thought"] + agent_thought.thought,
-                            "answer": agent_thoughts[event_id]["answer"] + agent_thought.answer,
-                            "latency": agent_thoughts[event_id]["latency"] + agent_thought.latency,
-                        }
+                        # 15.叠加智能体消息
+                        agent_thoughts[event_id] = agent_thoughts[event_id].model_copy(update={
+                            "thought": agent_thoughts[event_id].thought + agent_thought.thought,
+                            "answer": agent_thoughts[event_id].answer + agent_thought.answer,
+                            "latency": agent_thought.latency,
+                        })
                 else:
-                    agent_thoughts[event_id] = {
-                        "id": event_id,
-                        "task_id": str(agent_thought.task_id),
-                        "event": agent_thought.event,
-                        "thought": agent_thought.thought,
-                        "observation": agent_thought.observation,
-                        "tool": agent_thought.tool,
-                        "tool_input": agent_thought.tool_input,
-                        "message": agent_thought.message,
-                        "answer": agent_thought.answer,
-                        "latency": agent_thought.latency,
-                    }
-
+                    # 16.处理其他类型事件的消息
+                    agent_thoughts[event_id] = agent_thought
             data = {
+                **agent_thought.model_dump(include={
+                    "event", "thought", "observation", "tool", "tool_input", "answer", "latency",
+                }),
                 "id": event_id,
                 "conversation_id": str(debug_conversation.id),
                 "message_id": str(message.id),
                 "task_id": str(agent_thought.task_id),
-                "event": agent_thought.event,
-                "thought": agent_thought.thought,
-                "observation": agent_thought.observation,
-                "tool": agent_thought.tool,
-                "tool_input": agent_thought.tool_input,
-                "answer": agent_thought.answer,
-                "latency": agent_thought.latency,
             }
             yield f"event: {agent_thought.event}\ndata:{json.dumps(data)}\n\n"
 
-        # 循环将消息以及推理过程添加到数据库中
+        # 22.将消息以及推理过程添加到数据库
         thread = Thread(
-            target=self._save_agent_thoughts,
+            target=self.conversation_service.save_agent_thoughts,
             kwargs={
                 "flask_app": current_app._get_current_object(),
                 "account_id": account.id,
-                "app_id": app.id,
-                "draft_app_config": draft_app_config,
+                "app_id": app_id,
+                "app_config": draft_app_config,
                 "conversation_id": debug_conversation.id,
                 "message_id": message.id,
-                "agent_thoughts": agent_thoughts,
-            },
+                "agent_thoughts": [agent_thought for agent_thought in agent_thoughts.values()],
+            }
+        )
+        thread.start()
+
+
+    def stop_debug_chat(self, app_id: UUID, task_id: UUID, account: Account) -> None:
+        """根据传递的应用id+任务id+账号，停止某个应用的调试会话，中断流式事件"""
+        # 1.获取应用信息并校验权限
+        self.get_app(app_id, account)
+
+        # 2.调用智能体队列管理器停止特定任务
+        AgentQueueManager.set_stop_flag(task_id, InvokeFrom.DEBUGGER, account.id)
+
+    def get_debug_conversation_messages_with_page(
+            self,
+            app_id: UUID,
+            req: GetDebugConversationMessagesWithPageReq,
+            account: Account
+    ) -> tuple[list[Message], Paginator]:
+        """根据传递的应用id+请求数据，获取调试会话消息列表分页数据"""
+        # 1.获取应用信息并校验权限
+        app = self.get_app(app_id, account)
+
+        # 2.获取应用的调试会话
+        debug_conversation = app.debug_conversation
+
+        # 3.构建分页器并构建游标条件
+        paginator = Paginator(db=self.db, req=req)
+        filters = []
+        if req.created_at.data:
+            # 4.将时间戳转换成DateTime
+            created_at_datetime = datetime.fromtimestamp(req.created_at.data)
+            filters.append(Message.created_at <= created_at_datetime)
+
+        # 5.执行分页并查询数据
+        messages = paginator.paginate(
+            self.db.session.query(Message).filter(
+                Message.conversation_id == debug_conversation.id,
+                Message.status.in_([MessageStatus.STOP, MessageStatus.NORMAL]),
+                Message.answer != "",
+                *filters,
+            ).order_by(desc("created_at"))
         )
 
-        thread.start()
+        return messages, paginator
+
 
     def _save_agent_thoughts(
             self,

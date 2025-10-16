@@ -128,26 +128,26 @@ class GetApiToolProviderResponse(Schema):
 
 
 class GetApiToolResponse(Schema):
-    """获取API工具参数详情"""
-    id = fields.UUID(metadata={"description": "工具ID"})
-    name = fields.Str(metadata={"description": "工具名称"})
-    description = fields.Str(metadata={"description": "工具描述"})
-    inputs = fields.List(fields.Dict(), dump_default=[], metadata={"description": "工具参数"})
-    provider = fields.Dict(metadata={"description": "工具提供者信息"})
+    """获取API工具参数详情响应"""
+    id = fields.UUID()
+    name = fields.String()
+    description = fields.String()
+    inputs = fields.List(fields.Dict, default=[])
+    provider = fields.Dict()
 
     @pre_dump
-    def process_data(self, data:ApiTool, **kwargs):
-        provider_info = data.provider
+    def process_data(self, data: ApiTool, **kwargs):
+        provider = data.provider
         return {
             "id": data.id,
             "name": data.name,
             "description": data.description,
-            "inputs": [{k:v for k,v in params.items() if k != "in"} for params in data.parameters],
-            "providers": {
-                "id": provider_info.id,
-                "name": provider_info.name,
-                "icon": provider_info.icon,
-                "description": provider_info.description,
-                "headers": provider_info.headers,
+            "inputs": [{k: v for k, v in parameter.items() if k != "in"} for parameter in data.parameters],
+            "provider": {
+                "id": provider.id,
+                "name": provider.name,
+                "icon": provider.icon,
+                "description": provider.description,
+                "headers": provider.headers,
             }
         }

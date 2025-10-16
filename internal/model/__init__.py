@@ -4,6 +4,8 @@ from .dataset import Dataset, DatasetQuery, Document, KeywordTable, Segment, Pro
 from .upload_file import UploadFile
 from .conversation import Message, MessageAgentThought, Conversation
 from .account import Account, AccountOAuth
+from .api_key import ApiKey
+from .end_user import EndUser
 
 __all__ = ["App",
            "ApiToolProvider",
@@ -24,5 +26,6 @@ __all__ = ["App",
            "AppConfigVersion",
            "AppDatasetJoin",
            "AppDatasetJoin",
-
+           "ApiKey",
+           "EndUser",
            ]
