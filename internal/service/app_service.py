@@ -342,7 +342,6 @@ class AppService(BaseService):
             updated_at=datetime.now(),
             **draft_app_config_dict,
         )
-
         return draft_app_config_record
 
     def get_debug_conversation_summary(self, app_id: UUID, account: Account) -> str:
